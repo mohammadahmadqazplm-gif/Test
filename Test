@@ -8,21 +8,31 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
--- ===== STOP CHECK — أول شي يشتغل =====
-local STOP_FILE = "oxyo_stop_hop.txt"
+-- ===== STOP SYSTEM =====
+-- نستخدم getgenv() + writefile كـ backup لأن كل executor مختلف
+
 local function isHopStopped()
-    local ok, val = pcall(readfile, STOP_FILE)
-    return ok and val == "stopped"
-end
-local function setHopStopped(stopped)
-    pcall(writefile, STOP_FILE, stopped and "stopped" or "")
+    if getgenv().OxyoHopStopped == true then return true end
+    local ok, val = pcall(readfile, "oxyo_stop_hop.txt")
+    if ok and val == "1" then return true end
+    return false
 end
 
--- لو اليوزر ضغط Stop في السيرفر السابق — نوقف هنا قبل ما يشتغل أي شي
+local function markHopStopped()
+    getgenv().OxyoHopStopped = true
+    pcall(writefile, "oxyo_stop_hop.txt", "1")
+end
+
+local function clearHopStopped()
+    getgenv().OxyoHopStopped = false
+    pcall(writefile, "oxyo_stop_hop.txt", "0")
+end
+
+-- أول شي لما يشتغل — لو ضغط Stop قبل هوب ما نكمل
 if isHopStopped() then
-    setHopStopped(false)
+    clearHopStopped()
     getgenv().OxyoAutoHopCoin = false
-    return  -- يوقف السكربت كامل
+    return
 end
 
 -- ===== AUTO EXECUTE =====
@@ -47,32 +57,38 @@ if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
     getgenv().OxyoVisitedServersTime = tick()
 end
 
--- ===== NUCLEAR STOP — يوقف كل شي فوراً =====
+-- ===== NUCLEAR STOP =====
 local function nuclearStop()
-    -- 1. يكتب الـ file عشان ما يشتغل في السيرفر الجديد
-    setHopStopped(true)
-    -- 2. يطفي كل الـ flags
+    -- فوراً — قبل أي task.wait في smartHop
     getgenv().OxyoAutoHopCoin = false
-    -- 3. يوقف threads داخلية (يتعرف عليها بعد تعريف المتغيرات)
-    task.defer(function()
-        autoHopCoinEnabled = false
-        autoCoinEnabled    = false
-        if coinCollectThread then
-            pcall(task.cancel, coinCollectThread)
-            coinCollectThread = nil
-        end
-        -- يدمّر الـ mobile GUI لو موجود
-        pcall(function()
-            local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
-            if g then g:Destroy() end
-        end)
-        pcall(function() Rayfield:Notify({ Title = "⛔ Auto Hop", Content = "Stopped completely.", Duration = 4, Image = 4483362458 }) end)
+    markHopStopped()
+
+    -- نوقف كل المتغيرات
+    autoHopCoinEnabled = false
+    autoCoinEnabled    = false
+
+    -- نلغي الـ threads
+    if coinCollectThread then
+        pcall(task.cancel, coinCollectThread)
+        coinCollectThread = nil
+    end
+
+    -- نمسح الـ mobile GUI
+    pcall(function()
+        local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+        if g then g:Destroy() end
+    end)
+
+    pcall(function()
+        Rayfield:Notify({ Title = "⛔ Auto Hop", Content = "Stopped.", Duration = 3, Image = 4483362458 })
     end)
 end
 
--- ===== SMART HOP — يتجنب المزورين والـ full =====
+-- ===== SMART HOP =====
 local function smartHop()
     task.wait(3)
+    -- لو ضغط Stop خلال الـ 3 ثواني
+    if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
 
     local ok, body = pcall(function()
         return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
@@ -118,6 +134,15 @@ setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     if method == "Kick" then return end
+
+    -- نمنع اللعبة من تعطيل الـ Jumping
+    if method == "SetStateEnabled" then
+        local args = {...}
+        if args[1] == Enum.HumanoidStateType.Jumping and args[2] == false then
+            return  -- نتجاهل أي محاولة تعطيل الجمب
+        end
+    end
+
     if method == "FireServer" or method == "InvokeServer" then
         local args = {...}
         if typeof(args[1]) == "string" then
@@ -3097,7 +3122,7 @@ if getgenv().OxyoAutoHopCoin == true then
     -- نشوف لو اليوزر ضغط Stop قبل
     if isHopStopped() then
         getgenv().OxyoAutoHopCoin = false
-        setHopStopped(false)
+        clearHopStopped()
         return
     end
     autoHopCoinEnabled = true
