@@ -8,6 +8,15 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
+-- نحفظ إعدادات الـ Lighting الأصلية قبل أي تغيير
+local originalLighting = {
+    Brightness     = Lighting.Brightness,
+    ClockTime      = Lighting.ClockTime,
+    FogEnd         = Lighting.FogEnd,
+    GlobalShadows  = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+}
+
 -- ===== STOP SYSTEM =====
 -- لو اليوزر أوقف الـ hop يدوياً في السيرفر السابق — نوقف هنا
 if getgenv().OxyoHopStopped == true then
@@ -271,12 +280,12 @@ local autoFeedEnabled    = false
 local autoFeedThread     = nil
 local FEED_INTERVAL      = 35
 
-local hitboxEnabled = false
-local hitboxSize    = 50
-local hitboxTransp  = 0.7
-local hitboxColor   = BrickColor.new("Really blue")
-
+local hitboxEnabled  = false
+local hitboxSize     = 50
+local hitboxTransp   = 0.7
+local hitboxColor    = BrickColor.new("Really blue")
 local antiDieEnabled = false
+local antiDieConn    = nil
 
 local fullBrightEnabled    = false
 local infiniteZoomEnabled  = false
@@ -1114,42 +1123,50 @@ local function buyGear(gearKey)
     return BUY_RESULT.NOT_IN_SHOP
 end
 
+local function hookAntiDie(hum)
+    if antiDieConn then antiDieConn:Disconnect() antiDieConn = nil end
+    if not hum then return end
+    antiDieConn = hum.HealthChanged:Connect(function()
+        if antiDieEnabled and hum.Health > 0 and hum.Health < hum.MaxHealth then
+            hum.Health = hum.MaxHealth
+        end
+    end)
+end
+
 player.CharacterAdded:Connect(function(char)
     character = char
     humanoid  = char:WaitForChild("Humanoid")
     rootPart  = char:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
     if humanoid then
-        -- نضمن إن الـ Jumping مفعّل دايماً
-        pcall(function() humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true) end)
+        hookJumpEnforce(humanoid)
+        hookAntiDie(humanoid)
         if speedEnabled then humanoid.WalkSpeed = currentSpeed end
         if jumpEnabled  then humanoid.JumpPower  = currentJumpPower end
     end
     if flyEnabled then task.wait(0.3) startFlySystem() end
 end)
 
--- نفعّله كمان على الكاركتر الحالي فوراً
-pcall(function()
-    if humanoid then
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+local function hookJumpEnforce(hum)
+    if not hum then return end
+    local function enforce()
+        if hum.Health <= 0 then return end
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        if not jumpEnabled then
+            if hum.JumpPower  <= 0 then hum.JumpPower  = 50  end
+            if hum.JumpHeight <= 0 then hum.JumpHeight = 7.2 end
+        end
     end
-end)
+    enforce()
+    hum:GetPropertyChangedSignal("JumpPower"):Connect(enforce)
+    hum:GetPropertyChangedSignal("JumpHeight"):Connect(enforce)
+    hum:GetPropertyChangedSignal("JumpEnabled"):Connect(enforce)
+end
 
--- نراقب كل 0.1 ثانية ونعيد تفعيل الـ Jumping لو اللعبة طفّته
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        pcall(function()
-            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                if not jumpEnabled then
-                    if hum.JumpPower <= 0  then hum.JumpPower  = 50  end
-                    if hum.JumpHeight <= 0 then hum.JumpHeight = 7.2 end
-                end
-            end
-        end)
-    end
+-- نفعّله على الكاركتر الحالي
+pcall(function()
+    if humanoid then hookJumpEnforce(humanoid) end
+    if humanoid then hookAntiDie(humanoid) end
 end)
 
 -- نتعامل مع JumpRequest — نجبر الجمب حتى لو اللعبة طفّته
@@ -1157,7 +1174,6 @@ UserInputService.JumpRequest:Connect(function()
     pcall(function()
         local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
-        -- نعيد تفعيل الجمب لو طافي ثم ننفّذه
         hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
         if infinityJumpEnabled then
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
@@ -1182,21 +1198,6 @@ task.spawn(function()
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
             end
-        end
-    end
-end)
-
--- Anti-Die (God Mode) — نملّي الهيلث كل 0.1s
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if antiDieEnabled then
-            pcall(function()
-                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    hum.Health = hum.MaxHealth
-                end
-            end)
         end
     end
 end)
@@ -1356,7 +1357,7 @@ MainTab:CreateToggle({
     Callback     = function(Value) noclipEnabled = Value end,
 })
 
-MainTab:CreateSection("Anti-Die")
+MainTab:CreateSection("Anti Die")
 
 MainTab:CreateToggle({
     Name         = "God Mode  (Anti Die)",
@@ -1365,6 +1366,11 @@ MainTab:CreateToggle({
     Callback     = function(Value)
         antiDieEnabled = Value
         if Value then
+            -- نملّي الهيلث فوراً
+            pcall(function()
+                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Health = hum.MaxHealth end
+            end)
             Rayfield:Notify({ Title = "God Mode", Content = "You are now immortal!", Duration = 3, Image = 4483362458 })
         end
     end,
@@ -2677,14 +2683,6 @@ HitboxTab:CreateDropdown({
     Callback      = function(Option) hitboxColor = BrickColor.new(type(Option)=="table" and Option[1] or Option) end,
 })
 
-local originalLighting = {
-    Brightness     = Lighting.Brightness,
-    ClockTime      = Lighting.ClockTime,
-    FogEnd         = Lighting.FogEnd,
-    GlobalShadows  = Lighting.GlobalShadows,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-}
-
 ExtraTab:CreateSection("Visual Enhancements")
 
 ExtraTab:CreateToggle({
@@ -2700,7 +2698,6 @@ ExtraTab:CreateToggle({
             Lighting.GlobalShadows  = false
             Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
         else
-            -- نرجع إعدادات اللعبة الأصلية
             Lighting.Brightness     = originalLighting.Brightness
             Lighting.ClockTime      = originalLighting.ClockTime
             Lighting.FogEnd         = originalLighting.FogEnd
@@ -3164,13 +3161,9 @@ end
 -- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
 
--- حفظ تلقائي كل 5 ثواني في الخلفية (نستنى 3 ثواني أول ما LoadConfig يخلص)
-task.spawn(function()
-    task.wait(3)
-    while true do
-        task.wait(5)
-        pcall(function() Rayfield:SaveConfiguration() end)
-    end
+-- حفظ عند إغلاق اللعبة فقط (Rayfield يتكفل بالباقي)
+game:BindToClose(function()
+    pcall(function() Rayfield:SaveConfiguration() end)
 end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
