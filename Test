@@ -8,17 +8,24 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
--- نضمن إعادة التشغيل بعد كل hop
--- ===== AUTO EXECUTE — مرة وحدة فقط =====
-local SCRIPT_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"
+-- ===== SINGLE RUN GUARD =====
+if getgenv().OxyoRunning then return end
+getgenv().OxyoRunning = true
 
-if not getgenv().OxyoQueueRegistered then
-    getgenv().OxyoQueueRegistered = true
-    if queue_on_teleport then
-        pcall(function()
-            queue_on_teleport(('loadstring(game:HttpGet("%s"))()'):format(SCRIPT_URL))
-        end)
-    end
+game:GetService("Players").LocalPlayer.AncestryChanged:Connect(function()
+    getgenv().OxyoRunning = false
+end)
+
+-- ===== AUTO HOP STOP FLAG — يتمسح لو اليوزر ضغط Stop =====
+local STOP_FILE = "oxyo_stop_hop.txt"
+
+local function isHopStopped()
+    local ok, val = pcall(readfile, STOP_FILE)
+    return ok and val == "stopped"
+end
+
+local function setHopStopped(stopped)
+    pcall(writefile, STOP_FILE, stopped and "stopped" or "")
 end
 
 -- ===== VISITED SERVERS =====
@@ -881,7 +888,8 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     -- RightShift يوقف الـ Auto Hop في أي وقت
     if input.KeyCode == Enum.KeyCode.RightShift then
         if getgenv().OxyoAutoHopCoin then
-            getgenv().OxyoAutoHopCoin  = false
+            getgenv().OxyoAutoHopCoin = false
+            setHopStopped(true)
             autoHopCoinEnabled         = false
             autoCoinEnabled            = false
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
@@ -1863,7 +1871,8 @@ CollectorTab:CreateParagraph({
 CollectorTab:CreateButton({
     Name     = "⛔ Stop Auto Hop",
     Callback = function()
-        getgenv().OxyoAutoHopCoin  = false
+        getgenv().OxyoAutoHopCoin = false
+            setHopStopped(true)
         autoHopCoinEnabled         = false
         autoCoinEnabled            = false
         if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
@@ -1913,7 +1922,8 @@ CollectorTab:CreateToggle({
         else
             autoHopCoinEnabled         = false
             autoCoinEnabled            = false
-            getgenv().OxyoAutoHopCoin  = false
+            getgenv().OxyoAutoHopCoin = false
+            setHopStopped(true)
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
             Rayfield:Notify({ Title = "Auto Hop", Content = "Stopped.", Duration = 2, Image = 4483362458 })
         end
@@ -3033,16 +3043,22 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
-pcall(function()
-    -- نحمّل الـ config ونتجاهل أي خطأ من عناصر جديدة مو موجودة في السيف
-    local ok, err = pcall(function() Rayfield:LoadConfiguration() end)
-    if not ok then
-        -- مو مشكلة — عناصر جديدة بس ما تم حفظها قبل
+-- Auto-save كل دقيقة بدل LoadConfiguration اللي يسبب أخطاء
+task.spawn(function()
+    while true do
+        task.wait(60)
+        pcall(function() Rayfield:SaveConfiguration() end)
     end
 end)
 
 -- ✅ Startup: لو جاي من Auto Hop نفعّل الوضع تلقائياً
 if getgenv().OxyoAutoHopCoin == true then
+    -- نشوف لو اليوزر ضغط Stop قبل
+    if isHopStopped() then
+        getgenv().OxyoAutoHopCoin = false
+        setHopStopped(false)
+        return
+    end
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
     hideLava()
@@ -3072,7 +3088,8 @@ if getgenv().OxyoAutoHopCoin == true then
             corner.Parent = btn
 
             btn.MouseButton1Click:Connect(function()
-                getgenv().OxyoAutoHopCoin  = false
+                getgenv().OxyoAutoHopCoin = false
+            setHopStopped(true)
                 autoHopCoinEnabled         = false
                 autoCoinEnabled            = false
                 if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
