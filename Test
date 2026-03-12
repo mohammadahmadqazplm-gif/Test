@@ -2925,14 +2925,30 @@ if getgenv().OxyoAutoHopCoin == true then
         local status, timeLeft = waitForCoinRainStatus(15)
 
         if status == "active" then
-            Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
-            coinEventActive   = true
-            coinEventDuration = timeLeft or 60
-            startCoinCollect()
+            if (timeLeft or 0) < 10 then
+                -- الـ event يكاد ينتهي — ما يستحق، نهوب
+                Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain almost over — hopping...", Duration = 2, Image = 4483362458 })
+                task.wait(1)
+                getgenv().OxyoAutoHopCoin = true
+                pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+            else
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
+                coinEventActive   = true
+                coinEventDuration = timeLeft or 60
+                startCoinCollect()
+            end
 
         elseif status == "queued" then
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
-            -- الـ Notification listener يتولى الباقي لما يبدأ
+            -- backup: لو الـ Notification ما وصل، نبدأ بعد timeLeft ثانية مباشرة
+            task.spawn(function()
+                task.wait(timeLeft + 2)
+                if autoHopCoinEnabled and not coinEventActive then
+                    coinEventActive   = true
+                    coinEventDuration = 60
+                    startCoinCollect()
+                end
+            end)
 
         else
             -- ما في Coin Rain في هذا السيرفر — نهوب
