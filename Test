@@ -46,6 +46,7 @@ end
 
 -- ===== SMART HOP — يتجنب المزورين والـ full =====
 local function smartHop()
+    task.wait(3)
 
     local ok, body = pcall(function()
         return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
