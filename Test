@@ -8,6 +8,17 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
+-- ===== AUTO EXECUTE =====
+-- نسجّل queue_on_teleport كل مرة يشتغل السكربت
+-- الـ executor نفسه يتعامل مع التكرار
+if queue_on_teleport then
+    pcall(function()
+        queue_on_teleport([[
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"))()
+        ]])
+    end)
+end
+
 -- ===== AUTO HOP STOP FLAG =====
 local STOP_FILE = "oxyo_stop_hop.txt"
 
