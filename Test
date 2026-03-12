@@ -8,27 +8,30 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
+-- ===== STOP CHECK — أول شي يشتغل =====
+local STOP_FILE = "oxyo_stop_hop.txt"
+local function isHopStopped()
+    local ok, val = pcall(readfile, STOP_FILE)
+    return ok and val == "stopped"
+end
+local function setHopStopped(stopped)
+    pcall(writefile, STOP_FILE, stopped and "stopped" or "")
+end
+
+-- لو اليوزر ضغط Stop في السيرفر السابق — نوقف هنا قبل ما يشتغل أي شي
+if isHopStopped() then
+    setHopStopped(false)
+    getgenv().OxyoAutoHopCoin = false
+    return  -- يوقف السكربت كامل
+end
+
 -- ===== AUTO EXECUTE =====
--- نسجّل queue_on_teleport كل مرة يشتغل السكربت
--- الـ executor نفسه يتعامل مع التكرار
 if queue_on_teleport then
     pcall(function()
         queue_on_teleport([[
             loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"))()
         ]])
     end)
-end
-
--- ===== AUTO HOP STOP FLAG =====
-local STOP_FILE = "oxyo_stop_hop.txt"
-
-local function isHopStopped()
-    local ok, val = pcall(readfile, STOP_FILE)
-    return ok and val == "stopped"
-end
-
-local function setHopStopped(stopped)
-    pcall(writefile, STOP_FILE, stopped and "stopped" or "")
 end
 
 -- ===== VISITED SERVERS =====
@@ -42,6 +45,29 @@ getgenv().OxyoVisitedServers[game.JobId] = true
 if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
     getgenv().OxyoVisitedServers     = {}
     getgenv().OxyoVisitedServersTime = tick()
+end
+
+-- ===== NUCLEAR STOP — يوقف كل شي فوراً =====
+local function nuclearStop()
+    -- 1. يكتب الـ file عشان ما يشتغل في السيرفر الجديد
+    setHopStopped(true)
+    -- 2. يطفي كل الـ flags
+    getgenv().OxyoAutoHopCoin = false
+    -- 3. يوقف threads داخلية (يتعرف عليها بعد تعريف المتغيرات)
+    task.defer(function()
+        autoHopCoinEnabled = false
+        autoCoinEnabled    = false
+        if coinCollectThread then
+            pcall(task.cancel, coinCollectThread)
+            coinCollectThread = nil
+        end
+        -- يدمّر الـ mobile GUI لو موجود
+        pcall(function()
+            local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+            if g then g:Destroy() end
+        end)
+        pcall(function() Rayfield:Notify({ Title = "⛔ Auto Hop", Content = "Stopped completely.", Duration = 4, Image = 4483362458 }) end)
+    end)
 end
 
 -- ===== SMART HOP — يتجنب المزورين والـ full =====
@@ -892,12 +918,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     -- RightShift يوقف الـ Auto Hop في أي وقت
     if input.KeyCode == Enum.KeyCode.RightShift then
         if getgenv().OxyoAutoHopCoin then
-            getgenv().OxyoAutoHopCoin = false
-            setHopStopped(true)
-            autoHopCoinEnabled         = false
-            autoCoinEnabled            = false
-            if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
-            Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Disabled via RightShift", Duration = 3, Image = 4483362458 })
+            nuclearStop()
         end
     end
 end)
@@ -1875,12 +1896,7 @@ CollectorTab:CreateParagraph({
 CollectorTab:CreateButton({
     Name     = "⛔ Stop Auto Hop",
     Callback = function()
-        getgenv().OxyoAutoHopCoin = false
-            setHopStopped(true)
-        autoHopCoinEnabled         = false
-        autoCoinEnabled            = false
-        if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
-        Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Stopped successfully.", Duration = 3, Image = 4483362458 })
+        nuclearStop()
     end,
 })
 
@@ -1924,12 +1940,7 @@ CollectorTab:CreateToggle({
                 end
             end)
         else
-            autoHopCoinEnabled         = false
-            autoCoinEnabled            = false
-            getgenv().OxyoAutoHopCoin = false
-            setHopStopped(true)
-            if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
-            Rayfield:Notify({ Title = "Auto Hop", Content = "Stopped.", Duration = 2, Image = 4483362458 })
+            nuclearStop()
         end
     end,
 })
@@ -3095,13 +3106,8 @@ if getgenv().OxyoAutoHopCoin == true then
             corner.Parent = btn
 
             btn.MouseButton1Click:Connect(function()
-                getgenv().OxyoAutoHopCoin = false
-            setHopStopped(true)
-                autoHopCoinEnabled         = false
-                autoCoinEnabled            = false
-                if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
                 screenGui:Destroy()
-                Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+                nuclearStop()
             end)
         end)
     end
