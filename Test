@@ -177,7 +177,7 @@ local autoMoneyThread    = nil
 local autoCoinEnabled    = false
 local autoCoinThread     = nil
 local autoHopCoinEnabled = false
-local autoHopCoinThread  = nil
+local coinEventDuration  = 60
 local autoUpgradeEnabled = false
 local autoUpgradeThread  = nil
 local autoSellEnabled    = false
@@ -615,7 +615,7 @@ end
 local allStates = {
     Enum.HumanoidStateType.Climbing,     Enum.HumanoidStateType.FallingDown,
     Enum.HumanoidStateType.Flying,       Enum.HumanoidStateType.Freefall,
-    Enum.HumanoidStateType.GettingUp,    Enum.HumanoidStateType.Jumping,
+    Enum.HumanoidStateType.GettingUp,
     Enum.HumanoidStateType.Landed,       Enum.HumanoidStateType.Physics,
     Enum.HumanoidStateType.PlatformStanding, Enum.HumanoidStateType.Ragdoll,
     Enum.HumanoidStateType.Running,      Enum.HumanoidStateType.RunningNoPhysics,
@@ -1625,13 +1625,12 @@ CollectorTab:CreateSection("Auto Coin")
 
 local coinEventActive   = false
 local coinCollectThread = nil
-local autoHopCoinEnabled = false
-local autoHopCoinThread  = nil
 
 local function startCoinCollect()
     if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
     coinCollectThread = task.spawn(function()
-        while autoCoinEnabled and coinEventActive do
+        local endTime = tick() + coinEventDuration
+        while autoCoinEnabled and tick() < endTime do
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if not root then task.wait(0.3) continue end
 
@@ -1646,7 +1645,7 @@ local function startCoinCollect()
             if #coins == 0 then task.wait(0.2) continue end
 
             for _, part in ipairs(coins) do
-                if not autoCoinEnabled or not coinEventActive then break end
+                if not autoCoinEnabled or tick() >= endTime then break end
                 if not part or not part.Parent then continue end
                 root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
                 if not root then break end
@@ -1654,36 +1653,40 @@ local function startCoinCollect()
                 task.wait(0.7)
             end
         end
+
+        -- خلص الـ event
+        coinEventActive = false
+        if coinCollectThread then coinCollectThread = nil end
+
+        if autoHopCoinEnabled then
+            Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
+            task.wait(1)
+            pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+        end
     end)
 end
 
+-- نراقب الـ Notification عشان نكشف بداية الـ Coin Rain
 pcall(function()
-    local tutorialRemote = ReplicatedStorage.Events:FindFirstChild("Tutorial")
-    if tutorialRemote then
-        tutorialRemote.OnClientEvent:Connect(function(action)
-            if tostring(action):lower() == "drop" then
-                coinEventActive = not coinEventActive
-                if coinEventActive then
-                    -- بدأ الـ event
-                    if autoCoinEnabled then startCoinCollect() end
-                else
-                    -- خلص الـ event
-                    if coinCollectThread then
-                        task.cancel(coinCollectThread)
-                        coinCollectThread = nil
-                    end
-                    -- لو Auto Hop شغال، نهوب على طول
-                    if autoHopCoinEnabled then
-                        Rayfield:Notify({ Title = "Auto Hop", Content = "Coin event ended — hopping...", Duration = 2, Image = 4483362458 })
-                        task.wait(0.5)
-                        pcall(function()
-                            TeleportService:Teleport(game.PlaceId, player)
-                        end)
-                    end
-                end
+    ReplicatedStorage.Events.Notification.OnClientEvent:Connect(function(msg)
+        if type(msg) ~= "string" then return end
+
+        -- نكشف "Coin Rain has started for Xs!"
+        local secs = msg:match("[Cc]oin [Rr]ain has started for (%d+)s")
+        if secs then
+            coinEventDuration = tonumber(secs) or 60
+            coinEventActive   = true
+
+            if autoCoinEnabled then
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Started — farming for " .. secs .. "s", Duration = 3, Image = 4483362458 })
+                startCoinCollect()
+            elseif autoHopCoinEnabled then
+                -- لو Auto Hop شغال بدون Auto Coin نشغّله تلقائياً
+                autoCoinEnabled = true
+                startCoinCollect()
             end
-        end)
-    end
+        end
+    end)
 end)
 
 CollectorTab:CreateToggle({
@@ -1694,9 +1697,11 @@ CollectorTab:CreateToggle({
         autoCoinEnabled = Value
         if Value then
             hideLava()
+            -- لو الـ event شغال أصلاً (دخلنا سيرفر وهو شغال)
             if coinEventActive then startCoinCollect() end
         else
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+            coinEventActive = false
         end
     end,
 })
@@ -1705,7 +1710,7 @@ CollectorTab:CreateSection("Auto Hop Coin Event")
 
 CollectorTab:CreateParagraph({
     Title   = "How it works",
-    Content = "Hops to a new server → waits for coin event to start → farms all coins → hops again automatically.",
+    Content = "Hops to a new server → waits for Coin Rain notification → farms coins for full duration → hops again. Repeats forever.",
 })
 
 CollectorTab:CreateToggle({
@@ -1715,28 +1720,18 @@ CollectorTab:CreateToggle({
     Callback     = function(Value)
         autoHopCoinEnabled = Value
         if Value then
-            -- نفعّل Auto Coin تلقائياً
             autoCoinEnabled = true
-
-            Rayfield:Notify({ Title = "Auto Hop", Content = "Waiting for coin event...", Duration = 3, Image = 4483362458 })
-
-            autoHopCoinThread = task.spawn(function()
-                -- لو الـ event شغال أصلاً من الحين نبدأ فوراً
-                if coinEventActive then
-                    startCoinCollect()
-                end
-
-                -- نستنى — كل شي باقي يتم عن طريق Tutorial remote
-                -- لما يخلص event الـ listener فوق يهوب
-                while autoHopCoinEnabled do
-                    task.wait(1)
-                end
-            end)
+            hideLava()
+            -- لو الـ event شغال من الحين
+            if coinEventActive then
+                startCoinCollect()
+            else
+                Rayfield:Notify({ Title = "Auto Hop", Content = "Waiting for Coin Rain...", Duration = 3, Image = 4483362458 })
+            end
         else
             autoHopCoinEnabled = false
             autoCoinEnabled    = false
-            if autoHopCoinThread  then task.cancel(autoHopCoinThread)  autoHopCoinThread  = nil end
-            if coinCollectThread  then task.cancel(coinCollectThread)  coinCollectThread  = nil end
+            if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
             Rayfield:Notify({ Title = "Auto Hop", Content = "Stopped.", Duration = 2, Image = 4483362458 })
         end
     end,
