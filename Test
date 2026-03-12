@@ -9,29 +9,47 @@ local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
 -- نضمن إعادة التشغيل بعد كل hop
-if queue_on_teleport then
-    queue_on_teleport([[
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"))()
-    ]])
+-- ===== AUTO EXECUTE — مضمون ما يطفي =====
+local SCRIPT_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"
+
+local function registerQueueOnTeleport()
+    if queue_on_teleport then
+        pcall(function()
+            queue_on_teleport(('loadstring(game:HttpGet("%s"))()'):format(SCRIPT_URL))
+        end)
+    end
 end
 
--- قائمة السيرفرات اللي زرناها (تتمسح كل 30 دقيقة)
+-- نسجّله فوراً
+registerQueueOnTeleport()
+
+-- نعيد تسجيله كل 30 ثانية عشان ما يطفي
+task.spawn(function()
+    while true do
+        task.wait(30)
+        registerQueueOnTeleport()
+    end
+end)
+
+-- ===== VISITED SERVERS =====
 if not getgenv().OxyoVisitedServers then
     getgenv().OxyoVisitedServers     = {}
     getgenv().OxyoVisitedServersTime = tick()
 end
 
--- نضيف السيرفر الحالي للقائمة
 getgenv().OxyoVisitedServers[game.JobId] = true
 
--- نمسح القائمة كل 30 دقيقة
 if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
     getgenv().OxyoVisitedServers     = {}
     getgenv().OxyoVisitedServersTime = tick()
 end
 
--- hop ذكي يتجنب السيرفرات المزورة
+-- ===== SMART HOP — يتجنب المزورين والـ full =====
 local function smartHop()
+    -- نعيد تسجيل queue_on_teleport قبل الـ hop عشان مضمون
+    registerQueueOnTeleport()
+    task.wait(0.2)
+
     local ok, body = pcall(function()
         return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
     end)
@@ -41,15 +59,16 @@ local function smartHop()
             return game:GetService("HttpService"):JSONDecode(body)
         end)
         if ok2 and data and data.data then
-            -- نرتب عشوائياً عشان ما ندخل نفس السيرفر الأول دايم
             local servers = {}
             for _, s in ipairs(data.data) do
-                if s.id and not getgenv().OxyoVisitedServers[s.id] and s.id ~= game.JobId then
+                local isFull    = s.playing and s.maxPlayers and s.playing >= s.maxPlayers
+                local isVisited = getgenv().OxyoVisitedServers[s.id]
+                local isCurrent = s.id == game.JobId
+                if s.id and not isFull and not isVisited and not isCurrent then
                     table.insert(servers, s.id)
                 end
             end
 
-            -- نختار عشوائي من القائمة
             if #servers > 0 then
                 local chosen = servers[math.random(1, #servers)]
                 getgenv().OxyoVisitedServers[chosen] = true
@@ -61,7 +80,7 @@ local function smartHop()
         end
     end
 
-    -- fallback لو فشل الـ API
+    -- fallback
     pcall(function()
         game:GetService("TeleportService"):Teleport(game.PlaceId, player)
     end)
@@ -122,16 +141,19 @@ do
         end)
         lastActive = tick()
     end)
-    RunService.Heartbeat:Connect(function()
-        if tick() - lastActive >= 55 then
-            pcall(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
-                VirtualUser:Button1Down(Vector2.new(), workspace.CurrentCamera.CFrame)
-                task.wait(0.05)
-                VirtualUser:Button1Up(Vector2.new(), workspace.CurrentCamera.CFrame)
-            end)
-            lastActive = tick()
+    task.spawn(function()
+        while true do
+            task.wait(10)
+            if tick() - lastActive >= 55 then
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    VirtualUser:Button1Down(Vector2.new(), workspace.CurrentCamera.CFrame)
+                    task.wait(0.05)
+                    VirtualUser:Button1Up(Vector2.new(), workspace.CurrentCamera.CFrame)
+                end)
+                lastActive = tick()
+            end
         end
     end)
 end
@@ -689,7 +711,7 @@ local function startMonitor()
     monitorThread = task.spawn(function()
         while monitorData.isRunning do
             pcall(scanWorld)
-            task.wait(0.5)
+            task.wait(1)
         end
     end)
 end
@@ -1092,10 +1114,19 @@ player.CharacterAdded:Connect(function(char)
     rootPart  = char:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
     if humanoid then
+        -- نضمن إن الـ Jumping مفعّل دايماً
+        pcall(function() humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true) end)
         if speedEnabled then humanoid.WalkSpeed = currentSpeed end
         if jumpEnabled  then humanoid.JumpPower  = currentJumpPower end
     end
     if flyEnabled then task.wait(0.3) startFlySystem() end
+end)
+
+-- نفعّله كمان على الكاركتر الحالي فوراً
+pcall(function()
+    if humanoid then
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+    end
 end)
 
 startMonitor()
@@ -1107,37 +1138,51 @@ pcall(function()
     end)
 end)
 
-RunService.Stepped:Connect(function()
-    if noclipEnabled and character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+-- Noclip — محسّن: بدل Stepped كل frame نستخدم loop بـ 0.05s
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if noclipEnabled and character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
         end
     end
 end)
 
-RunService.Heartbeat:Connect(function()
-    pcall(function()
-        local hum = character and character:FindFirstChild("Humanoid")
-        if not hum then return end
-        if speedEnabled then hum.WalkSpeed = currentSpeed end
-        if jumpEnabled  then hum.JumpPower  = currentJumpPower end
-    end)
+-- Speed/Jump enforcement — محسّن: بدل كل frame نستخدم 0.1s
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if speedEnabled or jumpEnabled then
+            pcall(function()
+                local hum = character and character:FindFirstChild("Humanoid")
+                if not hum then return end
+                if speedEnabled then hum.WalkSpeed = currentSpeed end
+                if jumpEnabled  then hum.JumpPower  = currentJumpPower end
+            end)
+        end
+    end
 end)
 
-RunService.RenderStepped:Connect(function()
-    if not hitboxEnabled then return end
-    for _, v in next, Players:GetPlayers() do
-        if v ~= player then
-            pcall(function()
-                local root = v.Character and v.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    root.Size         = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                    root.Transparency = hitboxTransp
-                    root.BrickColor   = hitboxColor
-                    root.Material     = Enum.Material.Neon
-                    root.CanCollide   = false
-                end
-            end)
+-- Hitbox — محسّن: بدل RenderStepped كل frame نستخدم 0.1s
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not hitboxEnabled then continue end
+        for _, v in next, Players:GetPlayers() do
+            if v ~= player then
+                pcall(function()
+                    local root = v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.Size         = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                        root.Transparency = hitboxTransp
+                        root.BrickColor   = hitboxColor
+                        root.Material     = Enum.Material.Neon
+                        root.CanCollide   = false
+                    end
+                end)
+            end
         end
     end
 end)
@@ -2640,12 +2685,15 @@ ExtraTab:CreateToggle({
                 end)
             end
             addCelestialESP()
-            celestialESPConnection = RunService.Heartbeat:Connect(function()
-                if celestialESPEnabled then addCelestialESP() end
+            celestialESPConnection = task.spawn(function()
+                while celestialESPEnabled do
+                    task.wait(1)
+                    addCelestialESP()
+                end
             end)
         else
             if celestialESPConnection then
-                celestialESPConnection:Disconnect()
+                celestialESPEnabled = false
                 celestialESPConnection = nil
             end
             pcall(function()
