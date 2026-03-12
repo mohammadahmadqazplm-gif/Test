@@ -315,6 +315,58 @@ local function restoreLava()
     lavaRemoved = false
 end
 
+-- يرجع: "active" + secondsLeft، أو "queued" + secondsUntilStart، أو nil
+local function getCoinRainStatus()
+    local ok, etc = pcall(function()
+        return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
+    end)
+    if not ok or not etc or not etc.OnGoingTimers then return nil end
+
+    -- نشيل الـ HTML tags من النص
+    local function stripTags(s)
+        return tostring(s):gsub("<[^>]+>", ""):gsub("&lt;", "<"):gsub("&gt;", ">")
+    end
+
+    for _, timer in pairs(etc.OnGoingTimers) do
+        local ui = timer.UI
+        if typeof(ui) ~= "Instance" then continue end
+        local timeLeft = tonumber(timer.TimeRemaining) or 0
+
+        -- event شغال الحين (E-*) — nameLabel
+        local nameLabel = ui:FindFirstChild("NameLabel")
+        if nameLabel and nameLabel:IsA("TextLabel") then
+            if stripTags(nameLabel.Text):find("Coin Rain") then
+                return "active", timeLeft
+            end
+        end
+
+        -- event قادم (QE-*) — Title
+        local titleLabel = ui:FindFirstChild("Title")
+        if titleLabel and titleLabel:IsA("TextLabel") then
+            if stripTags(titleLabel.Text):find("Coin Rain") then
+                return "queued", timeLeft
+            end
+        end
+    end
+
+    return nil
+end
+
+-- ينتظر حتى يجي data في OnGoingTimers ثم يرجع الـ status
+local function waitForCoinRainStatus(timeout)
+    local deadline = tick() + (timeout or 15)
+    while tick() < deadline do
+        local ok, etc = pcall(function()
+            return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
+        end)
+        if ok and etc and etc.OnGoingTimers and next(etc.OnGoingTimers) ~= nil then
+            return getCoinRainStatus()
+        end
+        task.wait(1)
+    end
+    return nil
+end
+
 local function getBrainrotFolder(rarity)
     if rarity == "Godly" then
         local br = workspace:FindFirstChild("Brainrots")
@@ -1654,13 +1706,14 @@ local function startCoinCollect()
             end
         end
 
-        -- خلص الـ event
         coinEventActive = false
-        if coinCollectThread then coinCollectThread = nil end
+        coinCollectThread = nil
 
+        -- خلص الفارم — نهوب
         if autoHopCoinEnabled then
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
+            getgenv().OxyoAutoHopCoin = true
             pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
         end
     end)
@@ -1670,19 +1723,12 @@ end
 pcall(function()
     ReplicatedStorage.Events.Notification.OnClientEvent:Connect(function(msg)
         if type(msg) ~= "string" then return end
-
-        -- نكشف "Coin Rain has started for Xs!"
         local secs = msg:match("[Cc]oin [Rr]ain has started for (%d+)s")
-        if secs then
+        if secs and not coinEventActive then
             coinEventDuration = tonumber(secs) or 60
             coinEventActive   = true
-
             if autoCoinEnabled then
                 Rayfield:Notify({ Title = "Coin Rain!", Content = "Started — farming for " .. secs .. "s", Duration = 3, Image = 4483362458 })
-                startCoinCollect()
-            elseif autoHopCoinEnabled then
-                -- لو Auto Hop شغال بدون Auto Coin نشغّله تلقائياً
-                autoCoinEnabled = true
                 startCoinCollect()
             end
         end
@@ -1697,7 +1743,6 @@ CollectorTab:CreateToggle({
         autoCoinEnabled = Value
         if Value then
             hideLava()
-            -- لو الـ event شغال أصلاً (دخلنا سيرفر وهو شغال)
             if coinEventActive then startCoinCollect() end
         else
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
@@ -1710,7 +1755,7 @@ CollectorTab:CreateSection("Auto Hop Coin Event")
 
 CollectorTab:CreateParagraph({
     Title   = "How it works",
-    Content = "Hops to a new server → waits for Coin Rain notification → farms coins for full duration → hops again. Repeats forever.",
+    Content = "Hops → waits for Coin Rain notification → farms → hops again. Repeats forever until disabled.",
 })
 
 CollectorTab:CreateToggle({
@@ -1722,15 +1767,20 @@ CollectorTab:CreateToggle({
         if Value then
             autoCoinEnabled = true
             hideLava()
-            -- لو الـ event شغال من الحين
+            getgenv().OxyoAutoHopCoin = true
+
+            -- لو الـ event شغال من الحين نبدأ فوراً
             if coinEventActive then
                 startCoinCollect()
             else
-                Rayfield:Notify({ Title = "Auto Hop", Content = "Waiting for Coin Rain...", Duration = 3, Image = 4483362458 })
+                Rayfield:Notify({ Title = "Auto Hop", Content = "Hopping to find Coin Rain...", Duration = 2, Image = 4483362458 })
+                task.wait(1)
+                pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
             end
         else
-            autoHopCoinEnabled = false
-            autoCoinEnabled    = false
+            autoHopCoinEnabled         = false
+            autoCoinEnabled            = false
+            getgenv().OxyoAutoHopCoin  = false
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
             Rayfield:Notify({ Title = "Auto Hop", Content = "Stopped.", Duration = 2, Image = 4483362458 })
         end
@@ -2854,5 +2904,37 @@ pcall(function()
         -- مو مشكلة — عناصر جديدة بس ما تم حفظها قبل
     end
 end)
+
+-- ✅ Startup: لو جاي من Auto Hop نفعّل الوضع تلقائياً
+if getgenv().OxyoAutoHopCoin == true then
+    autoHopCoinEnabled = true
+    autoCoinEnabled    = true
+    hideLava()
+
+    task.spawn(function()
+        Rayfield:Notify({ Title = "Auto Hop", Content = "Checking for Coin Rain...", Duration = 3, Image = 4483362458 })
+
+        -- ننتظر حتى يحمّل الـ EventTimerController ويجي فيه data (max 15 ثانية)
+        local status, timeLeft = waitForCoinRainStatus(15)
+
+        if status == "active" then
+            Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
+            coinEventActive   = true
+            coinEventDuration = timeLeft or 60
+            startCoinCollect()
+
+        elseif status == "queued" then
+            Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
+            -- الـ Notification listener يتولى الباقي لما يبدأ
+
+        else
+            -- ما في Coin Rain في هذا السيرفر — نهوب
+            Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
+            task.wait(1)
+            getgenv().OxyoAutoHopCoin = true
+            pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+        end
+    end)
+end
 
 print("Oxyo Hub v6 loaded.")
