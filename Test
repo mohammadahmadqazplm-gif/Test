@@ -1297,14 +1297,6 @@ MainTab:CreateButton({
     end,
 })
 
-MainTab:CreateButton({
-    Name     = "Save Config",
-    Callback = function()
-        pcall(function() Rayfield:SaveConfiguration() end)
-        Rayfield:Notify({ Title = "Config", Content = "Configuration saved!", Duration = 2, Image = 4483362458 })
-    end,
-})
-
 MainTab:CreateSection("Instant Grab")
 
 MainTab:CreateToggle({
@@ -1893,17 +1885,44 @@ CollectorTab:CreateSection("Auto Hop Coin Event")
 
 CollectorTab:CreateParagraph({
     Title   = "How it works",
-    Content = "يبحث عن سيرفر فيه Coin Rain ويفارمه تلقائياً.\n\nإيقاف: RightShift (PC) أو زر Stop أدناه",
+    Content = "Hops servers looking for an active Coin Rain event, farms all coins, then hops again automatically.\n\nTo stop: RightShift (PC) or the Stop button below.",
 })
 
+-- ===== STOP HOP GUI =====
+local function showStopHopGui()
+    pcall(function()
+        local old = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+        if old then old:Destroy() end
+    end)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name           = "OxyoStopHopGui"
+    screenGui.ResetOnSpawn   = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent         = game:GetService("CoreGui")
+
+    local btn = Instance.new("TextButton")
+    btn.Size             = UDim2.new(0, 170, 0, 55)
+    btn.Position         = UDim2.new(0.5, -85, 1, -80)
+    btn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    btn.TextColor3       = Color3.fromRGB(255, 255, 255)
+    btn.Text             = "⛔ Stop Auto Hop"
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 15
+    btn.Parent           = screenGui
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+    btn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        nuclearStop()
+    end)
+end
+
 -- ===== AUTO HOP TOGGLE =====
--- بدون Flag عشان LoadConfiguration ما يعيد تشغيله
 local hopToggleRef = CollectorTab:CreateToggle({
     Name         = "Auto Hop + Farm Coins",
     CurrentValue = false,
     Callback     = function(Value)
         if not Value then
-            -- إيقاف يدوي
             getgenv().OxyoAutoHopCoin = false
             getgenv().OxyoHopStopped  = true
             autoHopCoinEnabled = false
@@ -1920,12 +1939,13 @@ local hopToggleRef = CollectorTab:CreateToggle({
             return
         end
 
-        -- تفعيل يدوي
+        -- تفعيل
         getgenv().OxyoHopStopped  = false
         getgenv().OxyoAutoHopCoin = true
         autoHopCoinEnabled = true
         autoCoinEnabled    = true
         hideLava()
+        showStopHopGui()
 
         task.spawn(function()
             Rayfield:Notify({ Title = "Auto Hop", Content = "Checking this server...", Duration = 2, Image = 4483362458 })
@@ -3103,40 +3123,23 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
--- Rayfield يحفظ ويحمّل تلقائياً عبر ConfigurationSaving في CreateWindow
+-- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
+
+-- حفظ تلقائي كل 5 ثواني في الخلفية
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        pcall(function() Rayfield:SaveConfiguration() end)
+    end
+end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
     hideLava()
-
-    -- زر إيقاف للجوال فقط
-    local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-    if isMobile then
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name            = "OxyoStopHopGui"
-        screenGui.ResetOnSpawn    = false
-        screenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
-        screenGui.Parent          = game:GetService("CoreGui")
-
-        local btn = Instance.new("TextButton")
-        btn.Size             = UDim2.new(0, 170, 0, 55)
-        btn.Position         = UDim2.new(0.5, -85, 1, -80)
-        btn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-        btn.TextColor3       = Color3.fromRGB(255, 255, 255)
-        btn.Text             = "⛔ Stop Auto Hop"
-        btn.Font             = Enum.Font.GothamBold
-        btn.TextSize         = 15
-        btn.Parent           = screenGui
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-
-        btn.MouseButton1Click:Connect(function()
-            screenGui:Destroy()
-            nuclearStop()
-        end)
-    end
+    showStopHopGui()
 
     task.spawn(function()
         Rayfield:Notify({ Title = "Auto Hop", Content = "Checking for Coin Rain...", Duration = 3, Image = 4483362458 })
