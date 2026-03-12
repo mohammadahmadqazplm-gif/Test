@@ -1162,6 +1162,23 @@ pcall(function()
     end
 end)
 
+-- نراقب كل ثانية ونعيد تفعيل الـ Jumping لو اللعبة طفّته
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function()
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                -- لو الـ health وصل 0 بس اللاعب لازال موجود — نوقف AutoHop فقط
+                if hum.Health <= 0 and autoHopCoinEnabled then
+                    autoHopCoinEnabled = false
+                end
+            end
+        end)
+    end
+end)
+
 startMonitor()
 initTraitHook()
 
