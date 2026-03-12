@@ -61,8 +61,6 @@ local function nuclearStop()
             pcall(task.cancel, coinCollectThread)
             coinCollectThread = nil
         end
-        -- يحدّث الـ toggle في الـ UI
-        pcall(function() Rayfield:SetToggle("AutoHopCoin", false) end)
         -- يدمّر الـ mobile GUI لو موجود
         pcall(function()
             local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
