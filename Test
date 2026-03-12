@@ -3123,16 +3123,8 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
--- تحميل الإعدادات
+-- تحميل الإعدادات — Rayfield يحفظ تلقائياً عند كل تغيير عبر ConfigurationSaving
 pcall(function() Rayfield:LoadConfiguration() end)
-
--- حفظ تلقائي كل 5 ثواني في الخلفية
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        pcall(function() Rayfield:SaveConfiguration() end)
-    end
-end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
