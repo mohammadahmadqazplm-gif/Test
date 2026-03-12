@@ -61,6 +61,8 @@ local function nuclearStop()
             pcall(task.cancel, coinCollectThread)
             coinCollectThread = nil
         end
+        -- يحدّث الـ toggle في الـ UI
+        pcall(function() Rayfield:SetToggle("AutoHopCoin", false) end)
         -- يدمّر الـ mobile GUI لو موجود
         pcall(function()
             local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
@@ -461,6 +463,8 @@ end
 local function waitForCoinRainStatus(timeout)
     local deadline = tick() + (timeout or 15)
     while tick() < deadline do
+        -- نوقف فوراً لو ضغط Stop
+        if not getgenv().OxyoAutoHopCoin or isHopStopped() then return nil end
         local ok, etc = pcall(function()
             return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
         end)
@@ -1916,6 +1920,8 @@ CollectorTab:CreateToggle({
 
                 local status, timeLeft = waitForCoinRainStatus(10)
 
+                if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
+
                 if status == "active" and (timeLeft or 0) >= 10 then
                     Rayfield:Notify({ Title = "Coin Rain!", Content = "Active here! Farming now...", Duration = 3, Image = 4483362458 })
                     coinEventActive   = true
@@ -1926,6 +1932,7 @@ CollectorTab:CreateToggle({
                     Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
                     task.spawn(function()
                         task.wait(timeLeft + 2)
+                        if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
                         if autoHopCoinEnabled and not coinEventActive then
                             coinEventActive   = true
                             coinEventDuration = 60
@@ -1936,6 +1943,7 @@ CollectorTab:CreateToggle({
                 else
                     Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
                     task.wait(1)
+                    if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
                     smartHop()
                 end
             end)
@@ -3115,15 +3123,16 @@ if getgenv().OxyoAutoHopCoin == true then
     task.spawn(function()
         Rayfield:Notify({ Title = "Auto Hop", Content = "Checking for Coin Rain...", Duration = 3, Image = 4483362458 })
 
-        -- ننتظر حتى يحمّل الـ EventTimerController ويجي فيه data (max 15 ثانية)
         local status, timeLeft = waitForCoinRainStatus(15)
+
+        -- نوقف لو ضغط Stop خلال الانتظار
+        if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
 
         if status == "active" then
             if (timeLeft or 0) < 10 then
-                -- الـ event يكاد ينتهي — ما يستحق، نهوب
                 Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain almost over — hopping...", Duration = 2, Image = 4483362458 })
                 task.wait(1)
-                getgenv().OxyoAutoHopCoin = true
+                if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
                 smartHop()
             else
                 Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
@@ -3134,9 +3143,9 @@ if getgenv().OxyoAutoHopCoin == true then
 
         elseif status == "queued" then
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
-            -- backup: لو الـ Notification ما وصل، نبدأ بعد timeLeft ثانية مباشرة
             task.spawn(function()
                 task.wait(timeLeft + 2)
+                if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
                 if autoHopCoinEnabled and not coinEventActive then
                     coinEventActive   = true
                     coinEventDuration = 60
@@ -3145,10 +3154,9 @@ if getgenv().OxyoAutoHopCoin == true then
             end)
 
         else
-            -- ما في Coin Rain في هذا السيرفر — نهوب
             Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
-            getgenv().OxyoAutoHopCoin = true
+            if not getgenv().OxyoAutoHopCoin or isHopStopped() then return end
             smartHop()
         end
     end)
