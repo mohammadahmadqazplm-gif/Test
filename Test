@@ -276,6 +276,8 @@ local hitboxSize    = 50
 local hitboxTransp  = 0.7
 local hitboxColor   = BrickColor.new("Really blue")
 
+local antiDieEnabled = false
+
 local fullBrightEnabled    = false
 local infiniteZoomEnabled  = false
 local playerESPEnabled     = false
@@ -1133,19 +1135,17 @@ pcall(function()
     end
 end)
 
--- نراقب كل ثانية ونعيد تفعيل الـ Jumping لو اللعبة طفّته
+-- نراقب كل 0.1 ثانية ونعيد تفعيل الـ Jumping لو اللعبة طفّته
 task.spawn(function()
     while true do
-        task.wait(1)
+        task.wait(0.1)
         pcall(function()
             local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
                 hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-                if hum.JumpPower == 0 and not jumpEnabled then
-                    hum.JumpPower = 50
-                end
-                if hum.JumpHeight == 0 and not jumpEnabled then
-                    hum.JumpHeight = 7.2
+                if not jumpEnabled then
+                    if hum.JumpPower <= 0  then hum.JumpPower  = 50  end
+                    if hum.JumpHeight <= 0 then hum.JumpHeight = 7.2 end
                 end
             end
         end)
@@ -1182,6 +1182,21 @@ task.spawn(function()
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
             end
+        end
+    end
+end)
+
+-- Anti-Die (God Mode) — نملّي الهيلث كل 0.1s
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if antiDieEnabled then
+            pcall(function()
+                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.Health = hum.MaxHealth
+                end
+            end)
         end
     end
 end)
@@ -1339,6 +1354,20 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag         = "NoClip",
     Callback     = function(Value) noclipEnabled = Value end,
+})
+
+MainTab:CreateSection("Anti-Die")
+
+MainTab:CreateToggle({
+    Name         = "God Mode  (Anti Die)",
+    CurrentValue = false,
+    Flag         = "AntiDie",
+    Callback     = function(Value)
+        antiDieEnabled = Value
+        if Value then
+            Rayfield:Notify({ Title = "God Mode", Content = "You are now immortal!", Duration = 3, Image = 4483362458 })
+        end
+    end,
 })
 
 MainTab:CreateSection("Player")
@@ -2648,6 +2677,14 @@ HitboxTab:CreateDropdown({
     Callback      = function(Option) hitboxColor = BrickColor.new(type(Option)=="table" and Option[1] or Option) end,
 })
 
+local originalLighting = {
+    Brightness     = Lighting.Brightness,
+    ClockTime      = Lighting.ClockTime,
+    FogEnd         = Lighting.FogEnd,
+    GlobalShadows  = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+}
+
 ExtraTab:CreateSection("Visual Enhancements")
 
 ExtraTab:CreateToggle({
@@ -2663,11 +2700,12 @@ ExtraTab:CreateToggle({
             Lighting.GlobalShadows  = false
             Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
         else
-            Lighting.Brightness     = 1
-            Lighting.ClockTime      = 12
-            Lighting.FogEnd         = 100000
-            Lighting.GlobalShadows  = true
-            Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+            -- نرجع إعدادات اللعبة الأصلية
+            Lighting.Brightness     = originalLighting.Brightness
+            Lighting.ClockTime      = originalLighting.ClockTime
+            Lighting.FogEnd         = originalLighting.FogEnd
+            Lighting.GlobalShadows  = originalLighting.GlobalShadows
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
         end
     end,
 })
@@ -3123,8 +3161,17 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
--- تحميل الإعدادات — Rayfield يحفظ تلقائياً عند كل تغيير عبر ConfigurationSaving
+-- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
+
+-- حفظ تلقائي كل 5 ثواني في الخلفية (نستنى 3 ثواني أول ما LoadConfig يخلص)
+task.spawn(function()
+    task.wait(3)
+    while true do
+        task.wait(5)
+        pcall(function() Rayfield:SaveConfiguration() end)
+    end
+end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
