@@ -9,27 +9,17 @@ local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
 -- نضمن إعادة التشغيل بعد كل hop
--- ===== AUTO EXECUTE — مضمون ما يطفي =====
+-- ===== AUTO EXECUTE — مرة وحدة فقط =====
 local SCRIPT_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"
 
-local function registerQueueOnTeleport()
+if not getgenv().OxyoQueueRegistered then
+    getgenv().OxyoQueueRegistered = true
     if queue_on_teleport then
         pcall(function()
             queue_on_teleport(('loadstring(game:HttpGet("%s"))()'):format(SCRIPT_URL))
         end)
     end
 end
-
--- نسجّله فوراً
-registerQueueOnTeleport()
-
--- نعيد تسجيله كل 30 ثانية عشان ما يطفي
-task.spawn(function()
-    while true do
-        task.wait(30)
-        registerQueueOnTeleport()
-    end
-end)
 
 -- ===== VISITED SERVERS =====
 if not getgenv().OxyoVisitedServers then
@@ -46,9 +36,6 @@ end
 
 -- ===== SMART HOP — يتجنب المزورين والـ full =====
 local function smartHop()
-    -- نعيد تسجيل queue_on_teleport قبل الـ hop عشان مضمون
-    registerQueueOnTeleport()
-    task.wait(0.2)
 
     local ok, body = pcall(function()
         return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
@@ -3059,6 +3046,41 @@ if getgenv().OxyoAutoHopCoin == true then
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
     hideLava()
+
+    -- زر إيقاف للجوال
+    local isMobile = game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled
+    if isMobile then
+        task.spawn(function()
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Name = "OxyoStopHopGui"
+            screenGui.ResetOnSpawn = false
+            screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            screenGui.Parent = game:GetService("CoreGui")
+
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 160, 0, 55)
+            btn.Position = UDim2.new(0.5, -80, 1, -80)
+            btn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Text = "⛔ Stop Auto Hop"
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 15
+            btn.Parent = screenGui
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 10)
+            corner.Parent = btn
+
+            btn.MouseButton1Click:Connect(function()
+                getgenv().OxyoAutoHopCoin  = false
+                autoHopCoinEnabled         = false
+                autoCoinEnabled            = false
+                if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+                screenGui:Destroy()
+                Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+            end)
+        end)
+    end
 
     task.spawn(function()
         Rayfield:Notify({ Title = "Auto Hop", Content = "Checking for Coin Rain...", Duration = 3, Image = 4483362458 })
