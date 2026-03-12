@@ -15,6 +15,58 @@ if queue_on_teleport then
     ]])
 end
 
+-- قائمة السيرفرات اللي زرناها (تتمسح كل 30 دقيقة)
+if not getgenv().OxyoVisitedServers then
+    getgenv().OxyoVisitedServers     = {}
+    getgenv().OxyoVisitedServersTime = tick()
+end
+
+-- نضيف السيرفر الحالي للقائمة
+getgenv().OxyoVisitedServers[game.JobId] = true
+
+-- نمسح القائمة كل 30 دقيقة
+if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
+    getgenv().OxyoVisitedServers     = {}
+    getgenv().OxyoVisitedServersTime = tick()
+end
+
+-- hop ذكي يتجنب السيرفرات المزورة
+local function smartHop()
+    local ok, body = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
+    end)
+
+    if ok and body then
+        local ok2, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(body)
+        end)
+        if ok2 and data and data.data then
+            -- نرتب عشوائياً عشان ما ندخل نفس السيرفر الأول دايم
+            local servers = {}
+            for _, s in ipairs(data.data) do
+                if s.id and not getgenv().OxyoVisitedServers[s.id] and s.id ~= game.JobId then
+                    table.insert(servers, s.id)
+                end
+            end
+
+            -- نختار عشوائي من القائمة
+            if #servers > 0 then
+                local chosen = servers[math.random(1, #servers)]
+                getgenv().OxyoVisitedServers[chosen] = true
+                pcall(function()
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
+                end)
+                return
+            end
+        end
+    end
+
+    -- fallback لو فشل الـ API
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, player)
+    end)
+end
+
 local mt           = getrawmetatable(game)
 local old_namecall = mt.__namecall
 local old_index    = mt.__index
@@ -1721,7 +1773,7 @@ local function startCoinCollect()
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
             getgenv().OxyoAutoHopCoin = true
-            pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+            smartHop()
         end
     end)
 end
@@ -1782,7 +1834,7 @@ CollectorTab:CreateToggle({
             else
                 Rayfield:Notify({ Title = "Auto Hop", Content = "Hopping to find Coin Rain...", Duration = 2, Image = 4483362458 })
                 task.wait(1)
-                pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+                smartHop()
             end
         else
             autoHopCoinEnabled         = false
@@ -2930,7 +2982,7 @@ if getgenv().OxyoAutoHopCoin == true then
                 Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain almost over — hopping...", Duration = 2, Image = 4483362458 })
                 task.wait(1)
                 getgenv().OxyoAutoHopCoin = true
-                pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+                smartHop()
             else
                 Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
                 coinEventActive   = true
@@ -2955,7 +3007,7 @@ if getgenv().OxyoAutoHopCoin == true then
             Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
             getgenv().OxyoAutoHopCoin = true
-            pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, player) end)
+            smartHop()
         end
     end)
 end
