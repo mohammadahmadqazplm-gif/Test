@@ -3103,17 +3103,8 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
--- نحمّل الإعدادات المحفوظة
--- ملاحظة: AutoHop callback محمي بـ OxyoAutoHopCoin check
+-- Rayfield يحفظ ويحمّل تلقائياً عبر ConfigurationSaving في CreateWindow
 pcall(function() Rayfield:LoadConfiguration() end)
-
--- Auto-save كل دقيقة
-task.spawn(function()
-    while true do
-        task.wait(60)
-        pcall(function() Rayfield:SaveConfiguration() end)
-    end
-end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
