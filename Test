@@ -8,6 +8,13 @@ local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 
+-- نضمن إعادة التشغيل بعد كل hop
+if queue_on_teleport then
+    queue_on_teleport([[
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/main/Test"))()
+    ]])
+end
+
 local mt           = getrawmetatable(game)
 local old_namecall = mt.__namecall
 local old_index    = mt.__index
