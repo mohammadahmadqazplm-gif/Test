@@ -890,6 +890,17 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.Q then upHeld   = true  end
     if input.KeyCode == Enum.KeyCode.E then downHeld = true  end
+
+    -- RightShift يوقف الـ Auto Hop في أي وقت
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if getgenv().OxyoAutoHopCoin then
+            getgenv().OxyoAutoHopCoin  = false
+            autoHopCoinEnabled         = false
+            autoCoinEnabled            = false
+            if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+            Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Disabled via RightShift", Duration = 3, Image = 4483362458 })
+        end
+    end
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.Q then upHeld   = false end
@@ -1859,7 +1870,18 @@ CollectorTab:CreateSection("Auto Hop Coin Event")
 
 CollectorTab:CreateParagraph({
     Title   = "How it works",
-    Content = "Hops → waits for Coin Rain notification → farms → hops again. Repeats forever until disabled.",
+    Content = "Hops → waits for Coin Rain notification → farms → hops again. Repeats forever until disabled.\n\n⚠️ PC: press RightShift | Mobile: use Stop button below",
+})
+
+CollectorTab:CreateButton({
+    Name     = "⛔ Stop Auto Hop",
+    Callback = function()
+        getgenv().OxyoAutoHopCoin  = false
+        autoHopCoinEnabled         = false
+        autoCoinEnabled            = false
+        if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+        Rayfield:Notify({ Title = "Auto Hop Stopped", Content = "Stopped successfully.", Duration = 3, Image = 4483362458 })
+    end,
 })
 
 CollectorTab:CreateToggle({
