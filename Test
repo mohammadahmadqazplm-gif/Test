@@ -1242,6 +1242,55 @@ MainTab:CreateButton({
 MainTab:CreateSection("Utilities")
 
 MainTab:CreateButton({
+    Name     = "Reset Config",
+    Callback = function()
+        local togglesOff = {
+            "InstantGrab","NoClip","SpeedEnabled","JumpEnabled","InfinityJump",
+            "AutoMeteor","AutoLuckyBlock","AutoSpinWheel","AutoFarmToggle",
+            "AutoFarmNameToggle","AutoMoney","AutoCoin","AutoHopCoin",
+            "AutoUpgrade","AutoSell","MutationAlert","AutoBuyGear",
+            "AutoCheese","AutoFeedSteak","HitboxToggle","FullBright",
+            "InfiniteZoom","PlayerESP","CelestialESP",
+        }
+        local slidersDefault = {
+            SpeedSlider = 16, JumpSlider = 50, FlySpeed = 1,
+            MaxCarrySlider = 1, SellThreshold = 50, SellTimerInterval = 0,
+            HitboxSize = 50, HitboxTransp = 7,
+        }
+        local dropdownsDefault = {
+            RarityDropdown = {}, MutationDropdown = {}, TraitDropdown = {},
+            LuckyBlockType = {"All"}, HitboxColor = {"Really blue"},
+            GearDropdown = {}, MutationAlertDropdown = {},
+        }
+
+        for _, flag in ipairs(togglesOff) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(false)
+                end
+            end)
+        end
+        for flag, val in pairs(slidersDefault) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(val)
+                end
+            end)
+        end
+        for flag, val in pairs(dropdownsDefault) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(val)
+                end
+            end)
+        end
+
+        pcall(function() Rayfield:ResetConfiguration() end)
+        Rayfield:Notify({ Title = "Config Reset", Content = "All settings reset to default.", Duration = 3, Image = 4483362458 })
+    end,
+})
+
+MainTab:CreateButton({
     Name     = "Rejoin Server",
     Callback = function()
         task.wait(1)
