@@ -379,19 +379,12 @@ end
 
 local function hideLava()
     if lavaRemoved then return end
-    lavaRemoved = true
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "Lavas" or v.Name == "Lava" then
             pcall(function() v:Destroy() end)
         end
     end
-    workspace.DescendantAdded:Connect(function(v)
-        if not lavaRemoved then return end
-        if v.Name == "Lavas" or v.Name == "Lava" then
-            task.wait()
-            pcall(function() v:Destroy() end)
-        end
-    end)
+    lavaRemoved = true
 end
 
 local function restoreLava()
@@ -615,7 +608,6 @@ local stopFarmLoop
 local function startFarm(rarities)
     if collectorRunning then stopFarmLoop() task.wait(0.1) end
     collectorRunning = true
-    hideLava()
 
     collectorThread = task.spawn(function()
         while collectorRunning do
@@ -663,7 +655,6 @@ end
 stopFarmLoop = function()
     collectorRunning = false
     if collectorThread then task.cancel(collectorThread) collectorThread = nil end
-    restoreLava()
 end
 
 local function scanWorld()
@@ -1146,12 +1137,9 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 pcall(function()
-    if humanoid then
-        applyJumpFix(humanoid)
-    end
+    if humanoid then applyJumpFix(humanoid) end
 end)
 
--- نتعامل مع JumpRequest
 UserInputService.JumpRequest:Connect(function()
     pcall(function()
         local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -1720,7 +1708,6 @@ CollectorTab:CreateToggle({
                 autoNameEnabled = false
                 return
             end
-            hideLava()
             autoNameThread = task.spawn(function()
                 while autoNameEnabled do
                     if grabLock then task.wait(0.2) continue end
@@ -1742,7 +1729,6 @@ CollectorTab:CreateToggle({
             end)
         else
             if autoNameThread then task.cancel(autoNameThread) autoNameThread = nil end
-            if not collectorRunning then restoreLava() end
         end
     end,
 })
@@ -1870,7 +1856,6 @@ CollectorTab:CreateToggle({
     Callback     = function(Value)
         autoCoinEnabled = Value
         if Value then
-            hideLava()
             if coinEventActive then startCoinCollect() end
         else
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
@@ -1942,7 +1927,6 @@ local hopToggleRef = CollectorTab:CreateToggle({
         getgenv().OxyoAutoHopCoin = true
         autoHopCoinEnabled = true
         autoCoinEnabled    = true
-        hideLava()
         showStopHopGui()
 
         task.spawn(function()
@@ -2489,11 +2473,9 @@ CheeseTab:CreateToggle({
     Callback     = function(Value)
         autoCheeseEnabled = Value
         if Value then
-            hideLava()
             autoCheeseThread = task.spawn(runAutoCheeseLoop)
         else
             if autoCheeseThread then task.cancel(autoCheeseThread) autoCheeseThread = nil end
-            if not collectorRunning then restoreLava() end
         end
     end,
 })
@@ -2974,7 +2956,7 @@ local function makeEntry(entry, order)
     nameL.TextSize              = 12
     nameL.TextXAlignment        = Enum.TextXAlignment.Left
     nameL.TextTruncate          = Enum.TextTruncate.AtEnd
-    nameL.Text                  = entry.name
+    nameL.Text                  = tostring(entry.name or "?")
 
     local rarL = Instance.new("TextLabel", card)
     rarL.Size                  = UDim2.new(1, -100, 0, 14)
@@ -3124,16 +3106,17 @@ end
 -- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
 
--- حفظ عند إغلاق اللعبة
-game:BindToClose(function()
-    pcall(function() Rayfield:SaveConfiguration() end)
+task.spawn(function()
+    while true do
+        task.wait(60)
+        pcall(function() Rayfield:SaveConfiguration() end)
+    end
 end)
 
 -- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
-    hideLava()
     showStopHopGui()
 
     task.spawn(function()
