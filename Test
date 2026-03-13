@@ -9,15 +9,12 @@ local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 local origLight         = { Lighting.Brightness, Lighting.ClockTime, Lighting.FogEnd, Lighting.GlobalShadows, Lighting.OutdoorAmbient }
 
--- ===== STOP SYSTEM =====
--- لو اليوزر أوقف الـ hop يدوياً في السيرفر السابق — نوقف هنا
 if getgenv().OxyoHopStopped == true then
     getgenv().OxyoHopStopped  = false
     getgenv().OxyoAutoHopCoin = false
-    -- نكمل تشغيل السكربت بشكل طبيعي بدون auto hop
+
 end
 
--- ===== AUTO EXECUTE =====
 if queue_on_teleport then
     pcall(function()
         queue_on_teleport([[
@@ -26,7 +23,6 @@ if queue_on_teleport then
     end)
 end
 
--- ===== VISITED SERVERS =====
 if not getgenv().OxyoVisitedServers then
     getgenv().OxyoVisitedServers     = {}
     getgenv().OxyoVisitedServersTime = tick()
@@ -39,9 +35,6 @@ if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
     getgenv().OxyoVisitedServersTime = tick()
 end
 
-
-
--- ===== SMART HOP =====
 local function smartHop()
     task.wait(3)
     if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
@@ -77,7 +70,6 @@ local function smartHop()
         end
     end
 
-    -- fallback
     pcall(function() Rayfield:SaveConfiguration() end)
     pcall(function()
         game:GetService("TeleportService"):Teleport(game.PlaceId, player)
@@ -195,8 +187,8 @@ local currentSpeed        = 16
 local currentJumpPower    = 50
 local speedEnabled        = false
 local jumpEnabled         = false
-local originalSpeed       = nil  -- نحفظ السرعة الأصلية قبل ما نغيرها
-local originalJump        = nil  -- نحفظ الـ jump الأصلي
+local originalSpeed       = nil
+local originalJump        = nil
 
 local function getGameSpeed()
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -286,11 +278,11 @@ local celestialESPEnabled    = false
 local celestialESPConnection = nil
 
 local GEAR_REGISTRY = {
-    GrappleHook = { displayName = "Grapple Hook", coinPrice = 75,  serverKey = "GrappleHook"  },
-    LavaBoots   = { displayName = "Lava Boots",   coinPrice = 125, serverKey = "Lava Boots"   },
-    StopLava    = { displayName = "Stop Lava",     coinPrice = 250, serverKey = "Stop Lava"   },
-    MagicCarpet = { displayName = "Magic Carpet",  coinPrice = 475, serverKey = "MagicCarpet" },
-    LevelPotion = { displayName = "Level Potion",  coinPrice = 550, serverKey = "Level Potion"},
+    GrappleHook  = { displayName = "Grapple Hook",  coinPrice = 75,   serverKey = "GrappleHook"  },
+    LavaBoots    = { displayName = "Lava Boots",     coinPrice = 125,  serverKey = "Lava Boots"   },
+    StopLava     = { displayName = "Stop Lava",      coinPrice = 250,  serverKey = "Stop Lava"    },
+    MagicCarpet  = { displayName = "Magic Carpet",   coinPrice = 475,  serverKey = "MagicCarpet"  },
+    LevelPotion  = { displayName = "Level Potion",   coinPrice = 550,  serverKey = "Level Potion" },
 }
 local selectedGear     = nil
 local autoBuyEnabled   = false
@@ -393,14 +385,12 @@ local function restoreLava()
     lavaRemoved = false
 end
 
--- يرجع: "active" + secondsLeft، أو "queued" + secondsUntilStart، أو nil
 local function getCoinRainStatus()
     local ok, etc = pcall(function()
         return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
     end)
     if not ok or not etc or not etc.OnGoingTimers then return nil end
 
-    -- نشيل الـ HTML tags من النص
     local function stripTags(s)
         return tostring(s):gsub("<[^>]+>", ""):gsub("&lt;", "<"):gsub("&gt;", ">")
     end
@@ -410,7 +400,6 @@ local function getCoinRainStatus()
         if typeof(ui) ~= "Instance" then continue end
         local timeLeft = tonumber(timer.TimeRemaining) or 0
 
-        -- event شغال الحين (E-*) — nameLabel
         local nameLabel = ui:FindFirstChild("NameLabel")
         if nameLabel and nameLabel:IsA("TextLabel") then
             if stripTags(nameLabel.Text):find("Coin Rain") then
@@ -418,7 +407,6 @@ local function getCoinRainStatus()
             end
         end
 
-        -- event قادم (QE-*) — Title
         local titleLabel = ui:FindFirstChild("Title")
         if titleLabel and titleLabel:IsA("TextLabel") then
             if stripTags(titleLabel.Text):find("Coin Rain") then
@@ -430,11 +418,10 @@ local function getCoinRainStatus()
     return nil
 end
 
--- ينتظر حتى يجي data في OnGoingTimers ثم يرجع الـ status
 local function waitForCoinRainStatus(timeout)
     local deadline = tick() + (timeout or 15)
     while tick() < deadline do
-        -- نوقف فوراً لو ضغط Stop
+
         if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return nil end
         local ok, etc = pcall(function()
             return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
@@ -757,6 +744,8 @@ local function setHumanoidStates(enabled)
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if not hum then return end
     for _, state in ipairs(allStates) do hum:SetStateEnabled(state, enabled) end
+
+    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
     if enabled then
         hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
     else
@@ -888,7 +877,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     if input.KeyCode == Enum.KeyCode.Q then upHeld   = true  end
     if input.KeyCode == Enum.KeyCode.E then downHeld = true  end
 
-    -- RightShift يوقف الـ Auto Hop في أي وقت
     if input.KeyCode == Enum.KeyCode.RightShift then
         if getgenv().OxyoAutoHopCoin then
             nuclearStop()
@@ -917,7 +905,6 @@ local function duplicateEquipped()
     return true, "Duplicated: " .. tool.Name
 end
 
--- [FIX] نعد البرينروتس اللي في الشنطة (Backpack) + اللي معاه بيده (Character)
 local function getPlotBrainrotCount()
     local count = 0
     local backpack = player:FindFirstChild("Backpack")
@@ -935,7 +922,6 @@ local function getPlotBrainrotCount()
     return count
 end
 
--- [FIX] يدعم RemoteFunction و RemoteEvent + fallback بالاسم
 local function getSellRemote()
     local events = ReplicatedStorage:FindFirstChild("Events")
     if not events then return nil end
@@ -947,7 +933,6 @@ local function getSellRemote()
     return nil
 end
 
--- [FIX] يتعامل مع النوعين + لوق للديباق
 local function doSell()
     local remote = getSellRemote()
     if not remote then
@@ -1023,7 +1008,6 @@ local function tryFireBlock(block)
     end)
 end
 
--- حالات الشراء
 local BUY_RESULT = {
     SUCCESS      = "success",
     OUT_OF_STOCK = "out_of_stock",
@@ -1031,7 +1015,6 @@ local BUY_RESULT = {
     NOT_IN_SHOP  = "not_in_shop",
 }
 
--- نشوف الـ GearsAccess ايش فيه الحين
 local function getGearsInShop()
     local gf = workspace:FindFirstChild("GameFolder")
     local ga = gf and gf:FindFirstChild("Shops")
@@ -1045,10 +1028,9 @@ local function getGearsInShop()
     return names
 end
 
--- نجيب الكوينز الفعلية من الـ leaderstats
 local function getCoins()
     local ls = player:FindFirstChild("leaderstats")
-    if not ls then return math.huge end -- مو لاقي = ما نمنعه
+    if not ls then return math.huge end
     local coins = ls:FindFirstChild("Coins") or ls:FindFirstChild("Coin") or ls:FindFirstChild("Cash")
     if not coins then return math.huge end
     return tonumber(coins.Value) or 0
@@ -1058,9 +1040,10 @@ local function buyGear(gearKey)
     local data = GEAR_REGISTRY[gearKey]
     if not data then return BUY_RESULT.NOT_IN_SHOP end
 
-    local remote = ReplicatedStorage.Events.VendorPurchase
+    local remote = ReplicatedStorage:FindFirstChild("VendorPurchase", true)
+                or (ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("VendorPurchase"))
+    if not remote then return BUY_RESULT.NOT_IN_SHOP end
 
-    -- نشوف عدد الـ Tools قبل
     local backpack    = player:FindFirstChild("Backpack")
     local toolsBefore = {}
     if backpack then
@@ -1069,28 +1052,25 @@ local function buyGear(gearKey)
         end
     end
 
-    -- نصفر الـ notification ونبعث
     lastNotification = ""
     pcall(function() remote:FireServer(data.serverKey) end)
 
-    -- ننتظر رد الـ server (notification أو tool جديد)
     local waited = 0
     while waited < 1.5 do
         task.wait(0.1)
         waited = waited + 0.1
         if lastNotification ~= "" then break end
-        -- نشوف لو جاء tool جديد
+
         if backpack then
             for _, v in pairs(backpack:GetChildren()) do
                 if v:IsA("Tool") and not toolsBefore[v] then
-                    Rayfield:Notify({ Title = "✅ تم الشراء!", Content = data.displayName, Duration = 3, Image = 4483362458 })
+                    Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
                     return BUY_RESULT.SUCCESS
                 end
             end
         end
     end
 
-    -- نحلل الـ notification
     local notif = lastNotification:lower()
 
     if notif:find("out of stock") or notif:find("stock") then
@@ -1099,11 +1079,10 @@ local function buyGear(gearKey)
         return BUY_RESULT.NO_COINS
     end
 
-    -- تأكيد أخير — tool جديد؟
     if backpack then
         for _, v in pairs(backpack:GetChildren()) do
             if v:IsA("Tool") and not toolsBefore[v] then
-                Rayfield:Notify({ Title = "✅ تم الشراء!", Content = data.displayName, Duration = 3, Image = 4483362458 })
+                Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
                 return BUY_RESULT.SUCCESS
             end
         end
@@ -1162,7 +1141,6 @@ pcall(function()
     end)
 end)
 
--- Noclip — محسّن: بدل Stepped كل frame نستخدم loop بـ 0.05s
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -1174,7 +1152,6 @@ task.spawn(function()
     end
 end)
 
--- Speed/Jump enforcement — محسّن: بدل كل frame نستخدم 0.1s
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -1189,7 +1166,6 @@ task.spawn(function()
     end
 end)
 
--- Hitbox — محسّن: بدل RenderStepped كل frame نستخدم 0.1s
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -1340,11 +1316,11 @@ MainTab:CreateToggle({
         pcall(function()
             if character and character:FindFirstChild("Humanoid") then
                 if speedEnabled then
-                    -- نحفظ السرعة الأصلية قبل ما نغيرها
+
                     originalSpeed = character.Humanoid.WalkSpeed
                     character.Humanoid.WalkSpeed = currentSpeed
                 else
-                    -- نرجع على السرعة الأصلية المحفوظة
+
                     character.Humanoid.WalkSpeed = originalSpeed or getGameSpeed()
                     originalSpeed = nil
                 end
@@ -1423,7 +1399,6 @@ MainTab:CreateSection("Fly")
 MainTab:CreateToggle({
     Name         = "Enable Fly  (Q = Up | E = Down)",
     CurrentValue = false,
-    Flag         = "Fly",
     Callback     = function(Value)
         flyEnabled = Value
         if Value then startFlySystem() else stopFlySystem() end
@@ -1790,8 +1765,6 @@ CollectorTab:CreateSection("Auto Coin")
 local coinEventActive   = false
 local coinCollectThread = nil
 
--- ===== NUCLEAR STOP — هنا بعد تعريف كل المتغيرات =====
--- nuclearStop forward declaration — تعريفها الحقيقي بعد hopToggleRef
 local nuclearStop
 
 local function startCoinCollect()
@@ -1825,7 +1798,6 @@ local function startCoinCollect()
         coinEventActive = false
         coinCollectThread = nil
 
-        -- خلص الفارم — نهوب
         if autoHopCoinEnabled then
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
@@ -1835,7 +1807,6 @@ local function startCoinCollect()
     end)
 end
 
--- نراقب الـ Notification عشان نكشف بداية الـ Coin Rain
 pcall(function()
     ReplicatedStorage.Events.Notification.OnClientEvent:Connect(function(msg)
         if type(msg) ~= "string" then return end
@@ -1873,7 +1844,6 @@ CollectorTab:CreateParagraph({
     Content = "Hops servers looking for an active Coin Rain event, farms all coins, then hops again automatically.\n\nTo stop: RightShift (PC) or the Stop button below.",
 })
 
--- ===== STOP HOP GUI =====
 local function showStopHopGui()
     pcall(function()
         local old = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
@@ -1902,7 +1872,6 @@ local function showStopHopGui()
     end)
 end
 
--- ===== AUTO HOP TOGGLE =====
 local hopToggleRef = CollectorTab:CreateToggle({
     Name         = "Auto Hop + Farm Coins",
     CurrentValue = false,
@@ -1925,7 +1894,6 @@ local hopToggleRef = CollectorTab:CreateToggle({
             return
         end
 
-        -- تفعيل
         getgenv().OxyoHopStopped  = false
         getgenv().OxyoAutoHopCoin = true
         autoHopCoinEnabled = true
@@ -1964,7 +1932,6 @@ local hopToggleRef = CollectorTab:CreateToggle({
     end,
 })
 
--- دالة تطفي الـ toggle في الـ UI
 local function setHopToggleOff()
     pcall(function()
         if hopToggleRef and hopToggleRef.Set then
@@ -1973,7 +1940,6 @@ local function setHopToggleOff()
     end)
 end
 
--- nuclearStop الحقيقي — يستخدم في RightShift وزر Stop
 nuclearStop = function()
     getgenv().OxyoAutoHopCoin = false
     getgenv().OxyoHopStopped  = true
@@ -2071,7 +2037,7 @@ CollectorTab:CreateToggle({
             autoSellThread = task.spawn(function()
                 local lastTimerSell = tick()
                 while autoSellEnabled do
-                    -- [FIX] نقرأ العدد الفعلي من الـ plot في كل دورة بدل counter خاطئ
+
                     local realCount     = getPlotBrainrotCount()
                     local elapsed       = tick() - lastTimerSell
                     local shouldByCount = realCount >= sellThreshold
@@ -2320,13 +2286,15 @@ GearTab:CreateButton({
     Name     = "Buy Selected Gear",
     Callback = function()
         if not selectedGear then
-            Rayfield:Notify({ Title = "Gear Shop", Content = "اختار gear من القائمة أولاً!", Duration = 3, Image = 4483362458 })
+            Rayfield:Notify({ Title = "Gear Shop", Content = "Select a gear from the list first!", Duration = 3, Image = 4483362458 })
             return
         end
         task.spawn(function()
-            local result = buyGear(selectedGear)
             local data   = GEAR_REGISTRY[selectedGear]
-            if result == BUY_RESULT.OUT_OF_STOCK then
+            local result = buyGear(selectedGear)
+            if result == BUY_RESULT.SUCCESS then
+                Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName .. " bought!", Duration = 4, Image = 4483362458 })
+            elseif result == BUY_RESULT.OUT_OF_STOCK then
                 Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is currently out of stock.", Duration = 4, Image = 4483362458 })
             elseif result == BUY_RESULT.NO_COINS then
                 Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins for " .. data.displayName, Duration = 4, Image = 4483362458 })
@@ -2360,7 +2328,7 @@ GearTab:CreateToggle({
             Rayfield:Notify({ Title = "Auto Buy", Content = "Watching for: " .. data.displayName, Duration = 3, Image = 4483362458 })
 
             autoBuyThread = task.spawn(function()
-                -- نراقب GearsAccess — لما ينزل الـ gear نشتري فوراً
+
                 local function isGearInShop()
                     local gf = workspace:FindFirstChild("GameFolder")
                     local ga = gf and gf:FindFirstChild("Shops")
@@ -2369,7 +2337,6 @@ GearTab:CreateToggle({
                     return ga ~= nil and #ga:GetChildren() > 0
                 end
 
-                -- الحالة الأولى — جرب فوراً
                 local result = buyGear(selectedGear)
 
                 if result == BUY_RESULT.SUCCESS then
@@ -2377,13 +2344,13 @@ GearTab:CreateToggle({
                     return
 
                 elseif result == BUY_RESULT.OUT_OF_STOCK then
-                    -- ما في مخزون — نوقف وننبه
+
                     Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is out of stock — Auto Buy stopped.", Duration = 5, Image = 4483362458 })
                     autoBuyEnabled = false
                     return
 
                 elseif result == BUY_RESULT.NO_COINS then
-                    -- ما في كوينز — كل 30 ثانية نحاول
+
                     Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins — retrying every 30s.", Duration = 4, Image = 4483362458 })
                     while autoBuyEnabled do
                         task.wait(30)
@@ -2402,15 +2369,14 @@ GearTab:CreateToggle({
                     end
 
                 elseif result == BUY_RESULT.NOT_IN_SHOP then
-                    -- مو في الشوب — نراقب GearsAccess ونشتري لحظة ما ينزل
+
                     Rayfield:Notify({ Title = "Not in Shop", Content = "Watching for " .. data.displayName .. " to appear...", Duration = 4, Image = 4483362458 })
 
-                    -- ننتظر حتى يظهر في GearsAccess
                     while autoBuyEnabled do
                         task.wait(1)
                         if not autoBuyEnabled then break end
                         if isGearInShop() then
-                            -- نزل! نشتري فوراً
+
                             task.wait(0.2)
                             local r = buyGear(selectedGear)
                             if r == BUY_RESULT.SUCCESS then
@@ -2422,7 +2388,7 @@ GearTab:CreateToggle({
                                 return
                             elseif r == BUY_RESULT.NO_COINS then
                                 Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins — retrying every 30s.", Duration = 4, Image = 4483362458 })
-                                -- نروح على loop الكوينز
+
                                 while autoBuyEnabled do
                                     task.wait(30)
                                     local r2 = buyGear(selectedGear)
@@ -3107,7 +3073,6 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
     })
 end
 
--- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
 
 task.spawn(function()
@@ -3117,7 +3082,6 @@ task.spawn(function()
     end
 end)
 
--- ✅ Startup: لو جاي من Auto Hop (بعد server hop)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
