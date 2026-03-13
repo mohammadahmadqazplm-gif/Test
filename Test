@@ -68,6 +68,7 @@ local function smartHop()
             if #servers > 0 then
                 local chosen = servers[math.random(1, #servers)]
                 getgenv().OxyoVisitedServers[chosen] = true
+                pcall(function() Rayfield:SaveConfiguration() end)
                 pcall(function()
                     game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
                 end)
@@ -77,6 +78,7 @@ local function smartHop()
     end
 
     -- fallback
+    pcall(function() Rayfield:SaveConfiguration() end)
     pcall(function()
         game:GetService("TeleportService"):Teleport(game.PlaceId, player)
     end)
@@ -1904,6 +1906,7 @@ end
 local hopToggleRef = CollectorTab:CreateToggle({
     Name         = "Auto Hop + Farm Coins",
     CurrentValue = false,
+    Flag         = "AutoHopCoin",
     Callback     = function(Value)
         if not Value then
             getgenv().OxyoAutoHopCoin = false
@@ -1927,6 +1930,7 @@ local hopToggleRef = CollectorTab:CreateToggle({
         getgenv().OxyoAutoHopCoin = true
         autoHopCoinEnabled = true
         autoCoinEnabled    = true
+        hideLava()
         showStopHopGui()
 
         task.spawn(function()
@@ -3117,6 +3121,7 @@ end)
 if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
     autoHopCoinEnabled = true
     autoCoinEnabled    = true
+    hideLava()
     showStopHopGui()
 
     task.spawn(function()
