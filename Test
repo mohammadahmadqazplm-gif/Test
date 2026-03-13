@@ -7,15 +7,7 @@ local GuiService        = game:GetService("GuiService")
 local TeleportService   = game:GetService("TeleportService")
 local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
-
--- نحفظ إعدادات الـ Lighting الأصلية قبل أي تغيير
-local originalLighting = {
-    Brightness     = Lighting.Brightness,
-    ClockTime      = Lighting.ClockTime,
-    FogEnd         = Lighting.FogEnd,
-    GlobalShadows  = Lighting.GlobalShadows,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-}
+local origLight         = { Lighting.Brightness, Lighting.ClockTime, Lighting.FogEnd, Lighting.GlobalShadows, Lighting.OutdoorAmbient }
 
 -- ===== STOP SYSTEM =====
 -- لو اليوزر أوقف الـ hop يدوياً في السيرفر السابق — نوقف هنا
@@ -90,32 +82,31 @@ local function smartHop()
     end)
 end
 
-local mt           = getrawmetatable(game)
-local old_namecall = mt.__namecall
-local old_index    = mt.__index
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if method == "Kick" then return end
-    if method == "FireServer" or method == "InvokeServer" then
-        local args = {...}
-        if typeof(args[1]) == "string" then
-            local s = args[1]:lower()
-            if s:find("kick") or s:find("ban") or s:find("anticheat") or
-               s:find("detect") or s:find("flag") or s:find("report") then
-                return
+do
+    local mt           = getrawmetatable(game)
+    local old_namecall = mt.__namecall
+    local old_index    = mt.__index
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" then return end
+        if method == "FireServer" or method == "InvokeServer" then
+            local args = {...}
+            if typeof(args[1]) == "string" then
+                local s = args[1]:lower()
+                if s:find("kick") or s:find("ban") or s:find("anticheat") or
+                   s:find("detect") or s:find("flag") or s:find("report") then
+                    return
+                end
             end
         end
-    end
-    return old_namecall(self, ...)
-end)
-
-mt.__index = newcclosure(function(self, key)
-    return old_index(self, key)
-end)
-
-setreadonly(mt, true)
+        return old_namecall(self, ...)
+    end)
+    mt.__index = newcclosure(function(self, key)
+        return old_index(self, key)
+    end)
+    setreadonly(mt, true)
+end
 
 for _, v in pairs(game:GetDescendants()) do
     if v:IsA("LocalScript") then
@@ -280,12 +271,10 @@ local autoFeedEnabled    = false
 local autoFeedThread     = nil
 local FEED_INTERVAL      = 35
 
-local hitboxEnabled  = false
-local hitboxSize     = 50
-local hitboxTransp   = 0.7
-local hitboxColor    = BrickColor.new("Really blue")
-local antiDieEnabled = false
-local antiDieConn    = nil
+local hitboxEnabled = false
+local hitboxSize    = 50
+local hitboxTransp  = 0.7
+local hitboxColor   = BrickColor.new("Really blue")
 
 local fullBrightEnabled    = false
 local infiniteZoomEnabled  = false
@@ -390,12 +379,19 @@ end
 
 local function hideLava()
     if lavaRemoved then return end
+    lavaRemoved = true
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "Lavas" or v.Name == "Lava" then
             pcall(function() v:Destroy() end)
         end
     end
-    lavaRemoved = true
+    workspace.DescendantAdded:Connect(function(v)
+        if not lavaRemoved then return end
+        if v.Name == "Lavas" or v.Name == "Lava" then
+            task.wait()
+            pcall(function() v:Destroy() end)
+        end
+    end)
 end
 
 local function restoreLava()
@@ -1123,14 +1119,17 @@ local function buyGear(gearKey)
     return BUY_RESULT.NOT_IN_SHOP
 end
 
-local function hookAntiDie(hum)
-    if antiDieConn then antiDieConn:Disconnect() antiDieConn = nil end
+local function applyJumpFix(hum)
     if not hum then return end
-    antiDieConn = hum.HealthChanged:Connect(function()
-        if antiDieEnabled and hum.Health > 0 and hum.Health < hum.MaxHealth then
-            hum.Health = hum.MaxHealth
+    local function enforce()
+        if hum.Health <= 0 then return end
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        if not jumpEnabled and hum.JumpPower <= 0 then
+            hum.JumpPower = 50
         end
-    end)
+    end
+    enforce()
+    hum:GetPropertyChangedSignal("JumpPower"):Connect(enforce)
 end
 
 player.CharacterAdded:Connect(function(char)
@@ -1139,37 +1138,20 @@ player.CharacterAdded:Connect(function(char)
     rootPart  = char:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
     if humanoid then
-        hookJumpEnforce(humanoid)
-        hookAntiDie(humanoid)
+        applyJumpFix(humanoid)
         if speedEnabled then humanoid.WalkSpeed = currentSpeed end
         if jumpEnabled  then humanoid.JumpPower  = currentJumpPower end
     end
     if flyEnabled then task.wait(0.3) startFlySystem() end
 end)
 
-local function hookJumpEnforce(hum)
-    if not hum then return end
-    local function enforce()
-        if hum.Health <= 0 then return end
-        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-        if not jumpEnabled then
-            if hum.JumpPower  <= 0 then hum.JumpPower  = 50  end
-            if hum.JumpHeight <= 0 then hum.JumpHeight = 7.2 end
-        end
-    end
-    enforce()
-    hum:GetPropertyChangedSignal("JumpPower"):Connect(enforce)
-    hum:GetPropertyChangedSignal("JumpHeight"):Connect(enforce)
-    hum:GetPropertyChangedSignal("JumpEnabled"):Connect(enforce)
-end
-
--- نفعّله على الكاركتر الحالي
 pcall(function()
-    if humanoid then hookJumpEnforce(humanoid) end
-    if humanoid then hookAntiDie(humanoid) end
+    if humanoid then
+        applyJumpFix(humanoid)
+    end
 end)
 
--- نتعامل مع JumpRequest — نجبر الجمب حتى لو اللعبة طفّته
+-- نتعامل مع JumpRequest
 UserInputService.JumpRequest:Connect(function()
     pcall(function()
         local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -1355,25 +1337,6 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag         = "NoClip",
     Callback     = function(Value) noclipEnabled = Value end,
-})
-
-MainTab:CreateSection("Anti Die")
-
-MainTab:CreateToggle({
-    Name         = "God Mode  (Anti Die)",
-    CurrentValue = false,
-    Flag         = "AntiDie",
-    Callback     = function(Value)
-        antiDieEnabled = Value
-        if Value then
-            -- نملّي الهيلث فوراً
-            pcall(function()
-                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-                if hum then hum.Health = hum.MaxHealth end
-            end)
-            Rayfield:Notify({ Title = "God Mode", Content = "You are now immortal!", Duration = 3, Image = 4483362458 })
-        end
-    end,
 })
 
 MainTab:CreateSection("Player")
@@ -2698,11 +2661,11 @@ ExtraTab:CreateToggle({
             Lighting.GlobalShadows  = false
             Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
         else
-            Lighting.Brightness     = originalLighting.Brightness
-            Lighting.ClockTime      = originalLighting.ClockTime
-            Lighting.FogEnd         = originalLighting.FogEnd
-            Lighting.GlobalShadows  = originalLighting.GlobalShadows
-            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.Brightness     = origLight[1]
+            Lighting.ClockTime      = origLight[2]
+            Lighting.FogEnd         = origLight[3]
+            Lighting.GlobalShadows  = origLight[4]
+            Lighting.OutdoorAmbient = origLight[5]
         end
     end,
 })
@@ -3161,7 +3124,7 @@ end
 -- تحميل الإعدادات
 pcall(function() Rayfield:LoadConfiguration() end)
 
--- حفظ عند إغلاق اللعبة فقط (Rayfield يتكفل بالباقي)
+-- حفظ عند إغلاق اللعبة
 game:BindToClose(function()
     pcall(function() Rayfield:SaveConfiguration() end)
 end)
