@@ -9,10 +9,21 @@ local VirtualUser       = game:GetService("VirtualUser")
 local Lighting          = game:GetService("Lighting")
 local origLight         = { Lighting.Brightness, Lighting.ClockTime, Lighting.FogEnd, Lighting.GlobalShadows, Lighting.OutdoorAmbient }
 
--- ── Executor Compatibility Layer ──────────────────────────────────────────────
-if not getgenv then
-    getgenv = function() return _G end
+if not getgenv then getgenv = function() return _G end end
+
+if getgenv().OxyoHopStopped == true then
+    getgenv().OxyoHopStopped      = false
+    getgenv().OxyoAutoHopCoin     = false
+    getgenv().OxyoHopGodlyStopped = false
+    getgenv().OxyoAutoHopGodly    = false
+    getgenv().OxyoHopCelStopped   = false
+    getgenv().OxyoAutoHopCel      = false
 end
+
+if getgenv().OxyoHubLoaded then
+    return
+end
+getgenv().OxyoHubLoaded = true
 
 if not setclipboard then
     setclipboard = function() end
@@ -101,14 +112,6 @@ local _hasAdvancedAPI = (typeof(getrawmetatable) == "function")
     and (pcall(function() return getrawmetatable(game) end))
 -- ──────────────────────────────────────────────────────────────────────────────
 
-if getgenv().OxyoHopStopped == true then
-    getgenv().OxyoHopStopped      = false
-    getgenv().OxyoAutoHopCoin     = false
-    getgenv().OxyoHopGodlyStopped = false
-    getgenv().OxyoAutoHopGodly    = false
-    getgenv().OxyoHopCelStopped   = false
-    getgenv().OxyoAutoHopCel      = false
-end
 
 local AUTO_EXEC_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/refs/heads/main/Test"
 
@@ -116,6 +119,7 @@ local function doTeleport(serverId)
     if queue_on_teleport then
         queue_on_teleport('loadstring(game:HttpGet("' .. AUTO_EXEC_URL .. '"))()')
     end
+    getgenv().OxyoHubLoaded = false
     task.wait(0.1)
     if serverId then
         pcall(function()
@@ -1238,50 +1242,44 @@ local function buyGear(gearKey)
 
     local remote = ReplicatedStorage:FindFirstChild("VendorPurchase", true)
                 or (ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("VendorPurchase"))
+                or (ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("VendorPurchase"))
     if not remote then return BUY_RESULT.NOT_IN_SHOP end
 
-    local backpack    = player:FindFirstChild("Backpack")
-    local toolsBefore = {}
-    if backpack then
-        for _, v in pairs(backpack:GetChildren()) do
-            if v:IsA("Tool") then toolsBefore[v] = true end
-        end
-    end
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return BUY_RESULT.NOT_IN_SHOP end
+
+    local received = false
+    local conn = backpack.ChildAdded:Connect(function(v)
+        if v:IsA("Tool") then received = true end
+    end)
 
     auto.lastNotif = ""
-    pcall(function() remote:FireServer(data.serverKey) end)
+    pcall(function()
+        if remote:IsA("RemoteFunction") then
+            remote:InvokeServer(data.serverKey)
+        else
+            remote:FireServer(data.serverKey)
+        end
+    end)
 
     local waited = 0
-    while waited < 1.5 do
+    while waited < 3 and not received do
         task.wait(0.1)
         waited = waited + 0.1
         if auto.lastNotif ~= "" then break end
+    end
+    conn:Disconnect()
 
-        if backpack then
-            for _, v in pairs(backpack:GetChildren()) do
-                if v:IsA("Tool") and not toolsBefore[v] then
-                    Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
-                    return BUY_RESULT.SUCCESS
-                end
-            end
-        end
+    if received then
+        Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
+        return BUY_RESULT.SUCCESS
     end
 
     local notif = auto.lastNotif:lower()
-
     if notif:find("out of stock") or notif:find("stock") then
         return BUY_RESULT.OUT_OF_STOCK
-    elseif notif:find("not enough") or notif:find("afford") or notif:find("coins") then
+    elseif notif:find("not enough") or notif:find("afford") or notif:find("coin") then
         return BUY_RESULT.NO_COINS
-    end
-
-    if backpack then
-        for _, v in pairs(backpack:GetChildren()) do
-            if v:IsA("Tool") and not toolsBefore[v] then
-                Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
-                return BUY_RESULT.SUCCESS
-            end
-        end
     end
 
     return BUY_RESULT.NOT_IN_SHOP
@@ -2016,43 +2014,69 @@ local coinCollectThread = nil
 
 local nuclearStop
 
-local function findCoins()
-    local coins = {}
-    local seen  = {}
-    local gf    = getGF()
-    local searchRoots = {}
-    if gf then
-        local cr = gf:FindFirstChild("CoinRain") or gf:FindFirstChild("Coins") or gf:FindFirstChild("CoinFolder")
-        if cr then
-            table.insert(searchRoots, cr)
-        else
-            table.insert(searchRoots, gf)
-        end
-    end
-    table.insert(searchRoots, workspace)
+local _liveCoinParts  = {}
+local _coinAddedConns = {}
 
-    for _, root in ipairs(searchRoots) do
-        for _, obj in pairs(root:GetDescendants()) do
+local function startCoinTracker()
+    for _, c in pairs(_coinAddedConns) do pcall(function() c:Disconnect() end) end
+    _coinAddedConns = {}
+    _liveCoinParts  = {}
+
+    local function trackParent(parent)
+        if not parent or not parent.Parent then return end
+        local conn = parent.ChildAdded:Connect(function(obj)
             local lname = obj.Name:lower()
-            if lname == "coin" or lname == "coinmodel" or lname == "coin_model" or lname:sub(1, 4) == "coin" then
+            if lname == "coin" or lname == "coinmodel" or lname == "coin_model" then
                 local part
                 if obj:IsA("BasePart") then
                     part = obj
                 elseif obj:IsA("Model") then
+                    task.wait()
                     part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
                 end
-                if part and not seen[part] then
-                    seen[part] = true
-                    table.insert(coins, part)
+                if part then
+                    _liveCoinParts[part] = true
+                    obj.AncestryChanged:Connect(function()
+                        if not obj.Parent then _liveCoinParts[part] = nil end
+                    end)
                 end
             end
+        end)
+        table.insert(_coinAddedConns, conn)
+    end
+
+    local gf = getGF()
+    if gf then
+        trackParent(gf)
+        local folders = {"CoinRain","Coins","CoinFolder","Events"}
+        for _, name in ipairs(folders) do
+            local f = gf:FindFirstChild(name)
+            if f then trackParent(f) end
         end
-        if #coins > 0 then break end
+    end
+    trackParent(workspace)
+end
+
+local function stopCoinTracker()
+    for _, c in pairs(_coinAddedConns) do pcall(function() c:Disconnect() end) end
+    _coinAddedConns = {}
+    _liveCoinParts  = {}
+end
+
+local function findCoins()
+    local coins = {}
+    for part in pairs(_liveCoinParts) do
+        if part and part.Parent then
+            table.insert(coins, part)
+        else
+            _liveCoinParts[part] = nil
+        end
     end
     return coins
 end
 
-local _coinHopDone = false
+local _coinHopDone    = false
+local _coinHopPending = false
 
 local function startCoinCollect()
     if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
@@ -2098,14 +2122,25 @@ local function startCoinCollect()
         coinEventActive   = false
         coinCollectThread = nil
 
+        pcall(function()
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if hum and root then
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end)
+
         if autoHopCoinEnabled and autoCoinEnabled and not _coinHopDone and not getgenv().OxyoHopStopped then
-            _coinHopDone = true
+            _coinHopDone    = true
+            _coinHopPending = true
             Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
             task.wait(1)
             if not getgenv().OxyoHopStopped and autoHopCoinEnabled then
                 getgenv().OxyoAutoHopCoin = true
                 task.spawn(smartHop)
             end
+            _coinHopPending = false
         end
     end)
 end
@@ -2151,13 +2186,13 @@ end)
 task.spawn(function()
     while true do
         task.wait(1.5)
-        if autoCoinEnabled then
+        if autoCoinEnabled and not _coinHopPending then
             local coins = findCoins()
             if #coins >= 2 and not coinEventActive then
                 coinEventDuration = 90
                 Rayfield:Notify({ Title = "Coin Rain!", Content = "Detected " .. #coins .. " coins!", Duration = 3, Image = 4483362458 })
                 startCoinCollect()
-            elseif coinEventActive and not coinCollectThread then
+            elseif coinEventActive and not coinCollectThread and not _coinHopPending then
                 startCoinCollect()
             end
         end
@@ -2172,6 +2207,7 @@ CollectorTab:CreateToggle({
         autoCoinEnabled = Value
         if Value then
             hideLava()
+            startCoinTracker()
             local coins = findCoins()
             if #coins >= 1 then
                 coinEventDuration = 90
@@ -2183,6 +2219,7 @@ CollectorTab:CreateToggle({
         else
             if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
             coinEventActive = false
+            stopCoinTracker()
         end
     end,
 })
@@ -2249,6 +2286,7 @@ local hopToggleRef = HopTab:CreateToggle({
         autoHopCoinEnabled = true
         autoCoinEnabled    = true
         hideLava()
+        startCoinTracker()
         showStopHopGui()
 
         task.spawn(function()
@@ -2306,6 +2344,7 @@ nuclearStop = function()
         pcall(task.cancel, coinCollectThread)
         coinCollectThread = nil
     end
+    stopCoinTracker()
     if autoHopGodlyThread then
         pcall(task.cancel, autoHopGodlyThread)
         autoHopGodlyThread = nil
