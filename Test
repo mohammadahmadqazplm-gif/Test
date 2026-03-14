@@ -374,30 +374,26 @@ local lavaRemoved       = false
 local traitData         = {}
 local monitorThread     = nil
 
-local _cachedGF          = nil
-local _cachedBrainrots   = nil
-local _cachedPlots       = nil
-local _cachedLuckyBlocks = nil
-local _cachedCoinsFolder = nil
+local _cache = { GF=nil, Brainrots=nil, Plots=nil, LuckyBlocks=nil, CoinsFolder=nil }
 
 local function getGF()
-    if _cachedGF and _cachedGF.Parent then return _cachedGF end
-    _cachedGF = workspace:FindFirstChild("GameFolder")
-    return _cachedGF
+    if _cache.GF and _cache.GF.Parent then return _cache.GF end
+    _cache.GF = workspace:FindFirstChild("GameFolder")
+    return _cache.GF
 end
 
 local function getBrainrotsFolder()
-    if _cachedBrainrots and _cachedBrainrots.Parent then return _cachedBrainrots end
+    if _cache.Brainrots and _cache.Brainrots.Parent then return _cache.Brainrots end
     local gf = getGF()
-    _cachedBrainrots = gf and gf:FindFirstChild("Brainrots")
-    return _cachedBrainrots
+    _cache.Brainrots = gf and gf:FindFirstChild("Brainrots")
+    return _cache.Brainrots
 end
 
 local function getPlotsFolder()
-    if _cachedPlots and _cachedPlots.Parent then return _cachedPlots end
+    if _cache.Plots and _cache.Plots.Parent then return _cache.Plots end
     local gf = getGF()
-    _cachedPlots = gf and gf:FindFirstChild("Plots")
-    return _cachedPlots
+    _cache.Plots = gf and gf:FindFirstChild("Plots")
+    return _cache.Plots
 end
 
 local ALL_RARITIES = {"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"}
@@ -1732,14 +1728,14 @@ CollectorTab:CreateToggle({
 
 CollectorTab:CreateSection("Auto Lucky Block")
 
-local LUCKY_OPTIONS = { "All" }
+local _luckyOpts = { "All" }
 for _, t in ipairs(LUCKY_TYPES) do
-    if t ~= "LuckyBlock" then table.insert(LUCKY_OPTIONS, t) end
+    if t ~= "LuckyBlock" then table.insert(_luckyOpts, t) end
 end
 
 CollectorTab:CreateDropdown({
     Name          = "Block Type",
-    Options       = LUCKY_OPTIONS,
+    Options       = _luckyOpts,
     CurrentOption = { "All" },
     Flag          = "LuckyBlockType",
     Callback      = function(opt)
@@ -2746,12 +2742,6 @@ GearTab:CreateButton({
 
 GearTab:CreateSection("Buy Gear")
 
-local gearOptions = {}
-for _, data in pairs(GEAR_REGISTRY) do
-    table.insert(gearOptions, data.displayName .. "  [" .. data.coinPrice .. " coins]")
-end
-table.sort(gearOptions)
-
 local function resolveGearKey(opt)
     for key, data in pairs(GEAR_REGISTRY) do
         if opt and opt:find(data.displayName, 1, true) then return key end
@@ -2759,16 +2749,24 @@ local function resolveGearKey(opt)
     return nil
 end
 
-GearTab:CreateDropdown({
-    Name          = "Select Gear",
-    Options       = gearOptions,
-    CurrentOption = {},
-    Flag          = "GearDropdown",
-    Callback      = function(Option)
-        local opt = type(Option) == "table" and Option[1] or Option
-        selectedGear = resolveGearKey(opt)
-    end,
-})
+do
+    local gearOptions = {}
+    for _, data in pairs(GEAR_REGISTRY) do
+        table.insert(gearOptions, data.displayName .. "  [" .. data.coinPrice .. " coins]")
+    end
+    table.sort(gearOptions)
+
+    GearTab:CreateDropdown({
+        Name          = "Select Gear",
+        Options       = gearOptions,
+        CurrentOption = {},
+        Flag          = "GearDropdown",
+        Callback      = function(Option)
+            local opt = type(Option) == "table" and Option[1] or Option
+            selectedGear = resolveGearKey(opt)
+        end,
+    })
+end
 
 GearTab:CreateButton({
     Name     = "Buy Selected Gear",
@@ -3549,32 +3547,30 @@ closeBtn.MouseButton1Click:Connect(function()
     stopListUpdate()
 end)
 
-local dragging     = false
-local dragStart    = nil
-local dragStartPos = nil
+local drag = { active=false, start=nil, startPos=nil }
 
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
-        dragging     = true
-        dragStart    = input.Position
-        dragStartPos = panel.Position
+        drag.active   = true
+        drag.start    = input.Position
+        drag.startPos = panel.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
+                drag.active = false
             end
         end)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if not dragging then return end
+    if not drag.active then return end
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
-        local d = input.Position - dragStart
+        local d = input.Position - drag.start
         panel.Position = UDim2.new(
-            dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
-            dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y
+            drag.startPos.X.Scale, drag.startPos.X.Offset + d.X,
+            drag.startPos.Y.Scale, drag.startPos.Y.Offset + d.Y
         )
     end
 end)
