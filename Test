@@ -110,8 +110,22 @@ if getgenv().OxyoHopStopped == true then
     getgenv().OxyoAutoHopCel      = false
 end
 
-if queue_on_teleport then
-    queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/refs/heads/main/Test"))()')
+local AUTO_EXEC_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/refs/heads/main/Test"
+
+local function doTeleport(serverId)
+    if queue_on_teleport then
+        queue_on_teleport('loadstring(game:HttpGet("' .. AUTO_EXEC_URL .. '"))()')
+    end
+    task.wait(0.1)
+    if serverId then
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId, player)
+        end)
+    else
+        pcall(function()
+            TeleportService:Teleport(game.PlaceId, player)
+        end)
+    end
 end
 
 if not getgenv().OxyoVisitedServers then
@@ -153,9 +167,7 @@ local function smartHop()
                 local chosen = servers[math.random(1, #servers)]
                 getgenv().OxyoVisitedServers[chosen] = true
                 pcall(function() Rayfield:SaveConfiguration() end)
-                pcall(function()
-                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
-                end)
+                doTeleport(chosen)
                 return
             end
         end
@@ -195,9 +207,7 @@ local function smartHopGeneric(enabledKey, stoppedKey)
                 local chosen = servers[math.random(1, #servers)]
                 getgenv().OxyoVisitedServers[chosen] = true
                 pcall(function() Rayfield:SaveConfiguration() end)
-                pcall(function()
-                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
-                end)
+                doTeleport(chosen)
                 return
             end
         end
@@ -288,9 +298,7 @@ GuiService.ErrorMessageChanged:Connect(function(msg)
         local m = msg:lower()
         if m:find("disconnect") or m:find("lost connection") or m:find("kicked") or m:find("connection timed out") then
             task.wait(1)
-            pcall(function()
-                TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
-            end)
+            doTeleport(nil)
         end
     end
 end)
@@ -361,6 +369,32 @@ local autoNameThread    = nil
 local lavaRemoved       = false
 local traitData         = {}
 local monitorThread     = nil
+
+local _cachedGF          = nil
+local _cachedBrainrots   = nil
+local _cachedPlots       = nil
+local _cachedLuckyBlocks = nil
+local _cachedCoinsFolder = nil
+
+local function getGF()
+    if _cachedGF and _cachedGF.Parent then return _cachedGF end
+    _cachedGF = workspace:FindFirstChild("GameFolder")
+    return _cachedGF
+end
+
+local function getBrainrotsFolder()
+    if _cachedBrainrots and _cachedBrainrots.Parent then return _cachedBrainrots end
+    local gf = getGF()
+    _cachedBrainrots = gf and gf:FindFirstChild("Brainrots")
+    return _cachedBrainrots
+end
+
+local function getPlotsFolder()
+    if _cachedPlots and _cachedPlots.Parent then return _cachedPlots end
+    local gf = getGF()
+    _cachedPlots = gf and gf:FindFirstChild("Plots")
+    return _cachedPlots
+end
 
 local ALL_RARITIES = {"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"}
 local ALL_TRAITS   = {"MoonGlow","Magma","Storm","Slime"}
@@ -498,9 +532,13 @@ end
 
 local function hideLava()
     if lavaRemoved then return end
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "Lavas" or v.Name == "Lava" then
-            pcall(function() v:Destroy() end)
+    local gf = getGF()
+    local targets = gf and {gf} or {workspace}
+    for _, root in ipairs(targets) do
+        for _, v in pairs(root:GetDescendants()) do
+            if v.Name == "Lavas" or v.Name == "Lava" then
+                pcall(function() v:Destroy() end)
+            end
         end
     end
     lavaRemoved = true
@@ -565,7 +603,7 @@ local function getBrainrotFolder(rarity)
         local f  = br and br:FindFirstChild("Godly")
         if f then return f end
     end
-    local gf = workspace:FindFirstChild("GameFolder")
+    local gf = getGF()
     if not gf then return nil end
     local br = gf:FindFirstChild("Brainrots")
     return br and br:FindFirstChild(rarity)
@@ -573,16 +611,24 @@ end
 
 local SUBMIT_ZONE_HINT = Vector3.new(-34.304245, 4.346454, -44.978447)
 
+local _cachedSubmitPart = nil
+
 local function findSubmitZone()
-    local gf = workspace:FindFirstChild("GameFolder")
+    if _cachedSubmitPart and _cachedSubmitPart.Parent then
+        return _cachedSubmitPart.CFrame + Vector3.new(0, 3, 0)
+    end
+    _cachedSubmitPart = nil
+    local gf = getGF()
     if gf then
         for _, d in pairs(gf:GetDescendants()) do
             if d:IsA("BasePart") then
                 local n = d.Name:lower()
                 if n:find("submit") or n:find("collect") or n:find("deposit") or n:find("drop") then
+                    _cachedSubmitPart = d
                     return d.CFrame + Vector3.new(0, 3, 0)
                 end
                 if (d.Position - SUBMIT_ZONE_HINT).Magnitude < 12 then
+                    _cachedSubmitPart = d
                     return d.CFrame + Vector3.new(0, 3, 0)
                 end
             end
@@ -590,6 +636,7 @@ local function findSubmitZone()
     end
     for _, d in pairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") and (d.Position - SUBMIT_ZONE_HINT).Magnitude < 12 then
+            _cachedSubmitPart = d
             return d.CFrame + Vector3.new(0, 3, 0)
         end
     end
@@ -1292,7 +1339,7 @@ end)
 
 task.spawn(function()
     while true do
-        task.wait(0.05)
+        task.wait(0.1)
         if noclipEnabled and character then
             for _, part in pairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -1443,9 +1490,7 @@ MainTab:CreateButton({
     Name     = "Rejoin Server",
     Callback = function()
         task.wait(1)
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-        end)
+        doTeleport(game.JobId)
     end,
 })
 
@@ -1453,9 +1498,7 @@ MainTab:CreateButton({
     Name     = "Server Hop",
     Callback = function()
         task.wait(1)
-        pcall(function()
-            TeleportService:Teleport(game.PlaceId, player)
-        end)
+        doTeleport(nil)
     end,
 })
 
@@ -1976,20 +2019,35 @@ local nuclearStop
 local function findCoins()
     local coins = {}
     local seen  = {}
-    for _, obj in pairs(workspace:GetDescendants()) do
-        local lname = obj.Name:lower()
-        if lname == "coin" or lname == "coinmodel" or lname == "coin_model" or lname:sub(1, 4) == "coin" then
-            local part
-            if obj:IsA("BasePart") then
-                part = obj
-            elseif obj:IsA("Model") then
-                part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-            end
-            if part and not seen[part] then
-                seen[part] = true
-                table.insert(coins, part)
+    local gf    = getGF()
+    local searchRoots = {}
+    if gf then
+        local cr = gf:FindFirstChild("CoinRain") or gf:FindFirstChild("Coins") or gf:FindFirstChild("CoinFolder")
+        if cr then
+            table.insert(searchRoots, cr)
+        else
+            table.insert(searchRoots, gf)
+        end
+    end
+    table.insert(searchRoots, workspace)
+
+    for _, root in ipairs(searchRoots) do
+        for _, obj in pairs(root:GetDescendants()) do
+            local lname = obj.Name:lower()
+            if lname == "coin" or lname == "coinmodel" or lname == "coin_model" or lname:sub(1, 4) == "coin" then
+                local part
+                if obj:IsA("BasePart") then
+                    part = obj
+                elseif obj:IsA("Model") then
+                    part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                end
+                if part and not seen[part] then
+                    seen[part] = true
+                    table.insert(coins, part)
+                end
             end
         end
+        if #coins > 0 then break end
     end
     return coins
 end
@@ -2467,11 +2525,18 @@ local statusParagraph = BrainrotStatusTab:CreateParagraph({
 BrainrotStatusTab:CreateSection("Live Brainrot Status")
 
 task.spawn(function()
+    local lastCount = -1
     while true do
         task.wait(0.5)
         pcall(function()
             local snapshot = monitorData.brainrots
-            if #snapshot == 0 then
+            local alive = 0
+            for _, entry in ipairs(snapshot) do
+                if entry.obj and entry.obj.Parent then alive = alive + 1 end
+            end
+            if alive == lastCount then return end
+            lastCount = alive
+            if alive == 0 then
                 pcall(function()
                     statusParagraph:Set({ Title = "Brainrots in World (0)", Content = "No Brainrots in world right now." })
                 end)
