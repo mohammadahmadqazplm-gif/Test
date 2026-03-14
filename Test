@@ -1,1 +1,3566 @@
-BTW
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local TweenService      = game:GetService("TweenService")
+local UserInputService  = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService        = game:GetService("GuiService")
+local TeleportService   = game:GetService("TeleportService")
+local VirtualUser       = game:GetService("VirtualUser")
+local Lighting          = game:GetService("Lighting")
+local origLight         = { Lighting.Brightness, Lighting.ClockTime, Lighting.FogEnd, Lighting.GlobalShadows, Lighting.OutdoorAmbient }
+
+-- ── Executor Compatibility Layer ──────────────────────────────────────────────
+if not getgenv then
+    getgenv = function() return _G end
+end
+
+if not setclipboard then
+    setclipboard = function() end
+end
+
+if not rconsoleprint then
+    rconsoleprint = function() end
+end
+
+if not isreadonly then
+    isreadonly = function() return false end
+end
+
+if not setreadonly then
+    setreadonly = function() end
+end
+
+if not newcclosure then
+    newcclosure = function(f) return f end
+end
+
+if not getnamecallmethod then
+    getnamecallmethod = function() return "" end
+end
+
+if not getrawmetatable then
+    getrawmetatable = function(o) return getmetatable(o) end
+end
+
+local _fireprox = (typeof(fireproximityprompt) == "function" and fireproximityprompt) or function(prompt)
+    if not prompt or not prompt.Parent then return end
+    local root = Players.LocalPlayer.Character
+    root = root and root:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local part = prompt.Parent
+    local targetPos
+    if part:IsA("BasePart") then
+        targetPos = part.Position + Vector3.new(0, 3, 0)
+    elseif part:IsA("Attachment") then
+        targetPos = part.WorldPosition + Vector3.new(0, 3, 0)
+    else
+        return
+    end
+    local oldCF = root.CFrame
+    pcall(function() root.CFrame = CFrame.new(targetPos) end)
+    task.wait(0.12)
+
+    local fired = false
+    fired = pcall(function()
+        local pps = game:GetService("ProximityPromptService")
+        pps:PromptTriggered(prompt, Players.LocalPlayer)
+    end)
+    if not fired then
+        pcall(function()
+            local ev = ReplicatedStorage:FindFirstChild("Events")
+            local interact = ev and (ev:FindFirstChild("Interact") or ev:FindFirstChild("ProximityPrompt") or ev:FindFirstChild("Trigger"))
+            if interact then interact:FireServer(prompt) end
+        end)
+    end
+    task.wait(0.08)
+end
+
+local _firetouchinterest = (typeof(firetouchinterest) == "function" and firetouchinterest) or function(part1, part2, touchType)
+    if not part1 or not part2 then return end
+    if touchType == 0 then
+        local old = part1.CFrame
+        local moved = false
+        moved = pcall(function() part1.CFrame = CFrame.new(part2.Position + Vector3.new(0, 0.5, 0)) end)
+        if not moved then
+            pcall(function() part1.Position = part2.Position + Vector3.new(0, 0.5, 0) end)
+        end
+        task.wait(0.08)
+        pcall(function() part1.CFrame = old end)
+    elseif touchType == 1 then
+        local old = part1.CFrame
+        pcall(function() part1.CFrame = CFrame.new(part2.Position + Vector3.new(0, 100, 0)) end)
+        task.wait(0.05)
+        pcall(function() part1.CFrame = old end)
+    end
+end
+
+local _hasAdvancedAPI = (typeof(getrawmetatable) == "function")
+    and (typeof(setreadonly) == "function")
+    and (typeof(newcclosure) == "function")
+    and (typeof(getnamecallmethod) == "function")
+    and (pcall(function() return getrawmetatable(game) end))
+-- ──────────────────────────────────────────────────────────────────────────────
+
+if getgenv().OxyoHopStopped == true then
+    getgenv().OxyoHopStopped      = false
+    getgenv().OxyoAutoHopCoin     = false
+    getgenv().OxyoHopGodlyStopped = false
+    getgenv().OxyoAutoHopGodly    = false
+    getgenv().OxyoHopCelStopped   = false
+    getgenv().OxyoAutoHopCel      = false
+end
+
+if queue_on_teleport then
+    queue_on_teleport('loadstring(game:HttpGet("https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/refs/heads/main/Test"))()')
+end
+
+if not getgenv().OxyoVisitedServers then
+    getgenv().OxyoVisitedServers     = {}
+    getgenv().OxyoVisitedServersTime = tick()
+end
+
+getgenv().OxyoVisitedServers[game.JobId] = true
+
+if tick() - (getgenv().OxyoVisitedServersTime or 0) > 1800 then
+    getgenv().OxyoVisitedServers     = {}
+    getgenv().OxyoVisitedServersTime = tick()
+end
+
+local function smartHop()
+    task.wait(3)
+    if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+
+    local ok, body = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    end)
+
+    if ok and body then
+        local ok2, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(body)
+        end)
+        if ok2 and data and data.data then
+            local servers = {}
+            for _, s in ipairs(data.data) do
+                local isFull    = s.playing and s.maxPlayers and s.playing >= (s.maxPlayers - 2)
+                local isVisited = getgenv().OxyoVisitedServers[s.id]
+                local isCurrent = s.id == game.JobId
+                if s.id and not isFull and not isVisited and not isCurrent then
+                    table.insert(servers, s.id)
+                end
+            end
+
+            if #servers > 0 then
+                local chosen = servers[math.random(1, #servers)]
+                getgenv().OxyoVisitedServers[chosen] = true
+                pcall(function() Rayfield:SaveConfiguration() end)
+                pcall(function()
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
+                end)
+                return
+            end
+        end
+    end
+
+    if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+    Rayfield:Notify({ Title = "Auto Hop", Content = "No valid servers found — retrying...", Duration = 3, Image = 4483362458 })
+    task.wait(5)
+    if getgenv().OxyoAutoHopCoin and not getgenv().OxyoHopStopped then
+        task.spawn(smartHop)
+    end
+end
+
+local function smartHopGeneric(enabledKey, stoppedKey)
+    task.wait(3)
+    if not getgenv()[enabledKey] or getgenv()[stoppedKey] then return end
+
+    local ok, body = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    end)
+
+    if ok and body then
+        local ok2, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(body)
+        end)
+        if ok2 and data and data.data then
+            local servers = {}
+            for _, s in ipairs(data.data) do
+                local isFull    = s.playing and s.maxPlayers and s.playing >= (s.maxPlayers - 2)
+                local isVisited = getgenv().OxyoVisitedServers[s.id]
+                local isCurrent = s.id == game.JobId
+                if s.id and not isFull and not isVisited and not isCurrent then
+                    table.insert(servers, s.id)
+                end
+            end
+            if #servers > 0 then
+                local chosen = servers[math.random(1, #servers)]
+                getgenv().OxyoVisitedServers[chosen] = true
+                pcall(function() Rayfield:SaveConfiguration() end)
+                pcall(function()
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, chosen, player)
+                end)
+                return
+            end
+        end
+    end
+
+    if not getgenv()[enabledKey] or getgenv()[stoppedKey] then return end
+    task.wait(5)
+    if getgenv()[enabledKey] and not getgenv()[stoppedKey] then
+        task.spawn(function() smartHopGeneric(enabledKey, stoppedKey) end)
+    end
+end
+
+if _hasAdvancedAPI then
+    pcall(function()
+        local mt           = getrawmetatable(game)
+        local old_namecall = mt.__namecall
+        local old_index    = mt.__index
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "Kick" then return end
+            if method == "FireServer" or method == "InvokeServer" then
+                local args = {...}
+                if typeof(args[1]) == "string" then
+                    local s = args[1]:lower()
+                    if s:find("kick") or s:find("ban") or s:find("anticheat") or
+                       s:find("detect") or s:find("flag") or s:find("report") then
+                        return
+                    end
+                end
+            end
+            return old_namecall(self, ...)
+        end)
+        mt.__index = newcclosure(function(self, key)
+            return old_index(self, key)
+        end)
+        setreadonly(mt, true)
+    end)
+end
+
+for _, v in pairs(game:GetDescendants()) do
+    if v:IsA("LocalScript") then
+        local n = v.Name:lower()
+        if n:find("anticheat") or n:find("detect") or n:find("security") then
+            pcall(function() v.Disabled = true v:Destroy() end)
+        end
+    end
+end
+
+game.DescendantAdded:Connect(function(v)
+    if v:IsA("LocalScript") then
+        local n = v.Name:lower()
+        if n:find("anticheat") or n:find("detect") or n:find("security") then
+            task.wait(0.1)
+            pcall(function() v.Disabled = true v:Destroy() end)
+        end
+    end
+end)
+
+do
+    local lastActive = tick()
+    Players.LocalPlayer.Idled:Connect(function()
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+        lastActive = tick()
+    end)
+    task.spawn(function()
+        while true do
+            task.wait(10)
+            if tick() - lastActive >= 55 then
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    VirtualUser:Button1Down(Vector2.new(), workspace.CurrentCamera.CFrame)
+                    task.wait(0.05)
+                    VirtualUser:Button1Up(Vector2.new(), workspace.CurrentCamera.CFrame)
+                end)
+                lastActive = tick()
+            end
+        end
+    end)
+end
+
+GuiService.ErrorMessageChanged:Connect(function(msg)
+    if msg and msg ~= "" then
+        local m = msg:lower()
+        if m:find("disconnect") or m:find("lost connection") or m:find("kicked") or m:find("connection timed out") then
+            task.wait(1)
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+            end)
+        end
+    end
+end)
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name            = "Oxyo | Survive Lava for Brainrots",
+    LoadingTitle    = "Loading Oxyo...",
+    LoadingSubtitle = "by Mohammad",
+    ConfigurationSaving = {
+        Enabled    = true,
+        FolderName = "OxyoHub",
+        FileName   = "oxyoHub_v5",
+    },
+    Discord = {
+        Enabled       = false,
+        Invite        = "noinvitelink",
+        RememberJoins = true,
+    },
+    KeySystem = false,
+})
+
+local player    = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid  = character:WaitForChild("Humanoid")
+local rootPart  = character:WaitForChild("HumanoidRootPart")
+
+local flyEnabled          = false
+local noclipEnabled       = false
+local infinityJumpEnabled = false
+local currentSpeed        = 16
+local currentJumpPower    = 50
+local speedEnabled        = false
+local jumpEnabled         = false
+local originalSpeed       = nil
+local originalJump        = nil
+
+local function getGameSpeed()
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    return hum and hum.WalkSpeed or 16
+end
+local function getGameJump()
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    return hum and hum.JumpPower or 50
+end
+
+local nowe      = false
+local speeds    = 1
+local tpwalking = false
+local upHeld    = false
+local downHeld  = false
+
+local instantGrabEnabled    = false
+local instantGrabConnection = nil
+local OriginalHoldTimes     = {}
+
+local collectorRunning  = false
+local collectorThread   = nil
+local selectedRarities  = {}
+local selectedMutations = {}
+local selectedTraits    = {}
+local grabLock          = false
+local maxCarry          = 1
+local farmByNameFilter  = ""
+local autoNameEnabled   = false
+local autoNameThread    = nil
+local lavaRemoved       = false
+local traitData         = {}
+local monitorThread     = nil
+
+local ALL_RARITIES = {"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"}
+local ALL_TRAITS   = {"MoonGlow","Magma","Storm","Slime"}
+local RARITY_ORDER = {Godly=1,Celestial=2,Secret=3,Mythic=4,Legendary=5,Epic=6,Rare=7,Common=8}
+
+local monitorData = {
+    brainrots  = {},
+    mutations  = {},
+    totalCount = 0,
+    lastScan   = 0,
+    isRunning  = false,
+}
+
+local auto = {
+    meteorEnabled  = false, meteorThread   = nil,
+    luckyEnabled   = false, luckyConn      = nil, luckyType     = "All",
+    spinEnabled    = false, spinThread     = nil,
+    moneyEnabled   = false, moneyThread    = nil,
+    upgradeEnabled = false, upgradeThread  = nil,
+    sellEnabled    = false, sellThread     = nil, sellThreshold = 50, sellTimer = 0,
+    cheeseEnabled  = false, cheeseThread   = nil, cheeseBusy    = false,
+    feedEnabled    = false, feedThread     = nil, feedInterval  = 35,
+    buyEnabled     = false, buyThread      = nil, lastNotif     = "",
+    alertEnabled   = false, alertThread    = nil,
+}
+local autoCoinEnabled    = false
+local autoHopCoinEnabled = false
+local autoHopGodlyEnabled = false
+local autoHopGodlyThread  = nil
+local autoHopCelEnabled   = false
+local autoHopCelThread    = nil
+local coinEventDuration  = 60
+local collectedCount     = 0
+local countConn          = nil
+
+local hitboxEnabled = false
+local hitboxSize    = 50
+local hitboxTransp  = 0.7
+local hitboxColor   = BrickColor.new("Really blue")
+
+local fullBrightEnabled    = false
+local infiniteZoomEnabled  = false
+local playerESPEnabled     = false
+local espConnections       = {}
+local celestialESPEnabled    = false
+local celestialESPConnection = nil
+
+local GEAR_REGISTRY = {
+    GrappleHook  = { displayName = "Grapple Hook",  coinPrice = 75,   serverKey = "GrappleHook"  },
+    LavaBoots    = { displayName = "Lava Boots",     coinPrice = 125,  serverKey = "Lava Boots"   },
+    StopLava     = { displayName = "Stop Lava",      coinPrice = 250,  serverKey = "Stop Lava"    },
+    MagicCarpet  = { displayName = "Magic Carpet",   coinPrice = 475,  serverKey = "MagicCarpet"  },
+    LevelPotion  = { displayName = "Level Potion",   coinPrice = 550,  serverKey = "Level Potion" },
+}
+local selectedGear     = nil
+
+local LUCKY_TYPES = {
+    "Common Lucky Block","Rare Lucky Block","Epic Lucky Block",
+    "Legendary Lucky Block","Mythic Lucky Block","Celestial Lucky Block",
+    "Secret Lucky Block","Godly Lucky Block","Magma Lucky Block",
+    "Food Lucky Block","Moon Magma Lucky Block","Moon Celestial Lucky Block",
+    "Moon Secret Lucky Block","Moon Mythic Lucky Block",
+}
+
+local ALERT_MUTATIONS       = {"Gold","Emerald","Diamond","Cheese","Bloodmoon","Rainbow"}
+local mutationAlertDropdown = {}
+
+local MainTab           = Window:CreateTab("Main",               4483362458)
+local CollectorTab      = Window:CreateTab("Auto",               4483362458)
+local BrainrotListTab   = Window:CreateTab("Brainrot List",      4483362458)
+local BrainrotStatusTab = Window:CreateTab("Brainrot Status",    4483362458)
+local LuckyStatusTab    = Window:CreateTab("Lucky Block Status", 4483362458)
+local GearTab           = Window:CreateTab("Shop",               4483362458)
+local HopTab            = Window:CreateTab("Hop",                4483362458)
+local CheeseTab         = Window:CreateTab("Event (Cheese)",     4483362458)
+local ZonesTab          = Window:CreateTab("Zones",              4483362458)
+local HitboxTab         = Window:CreateTab("Hitbox",             4483362458)
+local ExtraTab          = Window:CreateTab("Extra",              4483362458)
+
+local function safeTeleport(targetCFrame)
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local dist = (targetCFrame.Position - root.Position).Magnitude
+    if dist > 500 then
+        local mid = CFrame.new(root.Position:Lerp(targetCFrame.Position, 0.5)) + Vector3.new(0, 5, 0)
+        pcall(function() root.CFrame = mid end)
+        task.wait(0.08)
+    end
+    local ok = pcall(function() root.CFrame = targetCFrame end)
+    if not ok then
+        pcall(function()
+            local tw = TweenService:Create(root, TweenInfo.new(0.12, Enum.EasingStyle.Linear), { CFrame = targetCFrame })
+            tw:Play()
+            tw.Completed:Wait()
+        end)
+    end
+    return true
+end
+
+local function getPlayerPlot()
+    local gf = workspace:FindFirstChild("GameFolder")
+    local plots = gf and gf:FindFirstChild("Plots")
+    if not plots then return nil end
+    for _, plotModel in pairs(plots:GetChildren()) do
+        local brainrots = plotModel:FindFirstChild("Brainrots")
+        if not brainrots then continue end
+        for _, br in pairs(brainrots:GetChildren()) do
+            local ok, ownerVal = pcall(function() return br:GetAttribute("Owner") end)
+            if ok and ownerVal and tostring(ownerVal) == tostring(player.UserId) then
+                return plotModel
+            end
+        end
+    end
+    return nil
+end
+
+local function teleportToMyPlot()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local plotModel = getPlayerPlot()
+    if not plotModel then return false end
+    local att  = plotModel:FindFirstChild("YourBaseAtt")
+    local base = plotModel:FindFirstChild("Base")
+    local pos  = nil
+    if att then
+        pos = att.WorldPosition + Vector3.new(0, 6, 0)
+    elseif base then
+        local bp = (base:IsA("Model") and (base.PrimaryPart or base:FindFirstChildWhichIsA("BasePart")))
+                 or (base:IsA("BasePart") and base)
+        if bp then pos = bp.Position + Vector3.new(0, 6, 0) end
+    end
+    if pos then safeTeleport(CFrame.new(pos)) return true, plotModel end
+    return false
+end
+
+local function hideLava()
+    if lavaRemoved then return end
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "Lavas" or v.Name == "Lava" then
+            pcall(function() v:Destroy() end)
+        end
+    end
+    lavaRemoved = true
+end
+
+local function restoreLava()
+    lavaRemoved = false
+end
+
+local function getCoinRainStatus()
+    local ok, etc = pcall(function()
+        return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
+    end)
+    if not ok or not etc or not etc.OnGoingTimers then return nil end
+
+    local function stripTags(s)
+        return tostring(s):gsub("<[^>]+>", ""):gsub("&lt;", "<"):gsub("&gt;", ">")
+    end
+
+    for _, timer in pairs(etc.OnGoingTimers) do
+        local ui = timer.UI
+        if typeof(ui) ~= "Instance" then continue end
+        local timeLeft = tonumber(timer.TimeRemaining) or 0
+
+        local nameLabel = ui:FindFirstChild("NameLabel")
+        if nameLabel and nameLabel:IsA("TextLabel") then
+            if stripTags(nameLabel.Text):find("Coin Rain") then
+                return "active", timeLeft
+            end
+        end
+
+        local titleLabel = ui:FindFirstChild("Title")
+        if titleLabel and titleLabel:IsA("TextLabel") then
+            if stripTags(titleLabel.Text):find("Coin Rain") then
+                return "queued", timeLeft
+            end
+        end
+    end
+
+    return nil
+end
+
+local function waitForCoinRainStatus(timeout)
+    local deadline = tick() + (timeout or 15)
+    while tick() < deadline do
+
+        if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return nil end
+        local ok, etc = pcall(function()
+            return require(game:GetService("ReplicatedStorage").Modules.EventTimerController)
+        end)
+        if ok and etc and etc.OnGoingTimers and next(etc.OnGoingTimers) ~= nil then
+            return getCoinRainStatus()
+        end
+        task.wait(1)
+    end
+    return nil
+end
+
+local function getBrainrotFolder(rarity)
+    if rarity == "Godly" then
+        local br = workspace:FindFirstChild("Brainrots")
+        local f  = br and br:FindFirstChild("Godly")
+        if f then return f end
+    end
+    local gf = workspace:FindFirstChild("GameFolder")
+    if not gf then return nil end
+    local br = gf:FindFirstChild("Brainrots")
+    return br and br:FindFirstChild(rarity)
+end
+
+local SUBMIT_ZONE_HINT = Vector3.new(-34.304245, 4.346454, -44.978447)
+
+local function findSubmitZone()
+    local gf = workspace:FindFirstChild("GameFolder")
+    if gf then
+        for _, d in pairs(gf:GetDescendants()) do
+            if d:IsA("BasePart") then
+                local n = d.Name:lower()
+                if n:find("submit") or n:find("collect") or n:find("deposit") or n:find("drop") then
+                    return d.CFrame + Vector3.new(0, 3, 0)
+                end
+                if (d.Position - SUBMIT_ZONE_HINT).Magnitude < 12 then
+                    return d.CFrame + Vector3.new(0, 3, 0)
+                end
+            end
+        end
+    end
+    for _, d in pairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") and (d.Position - SUBMIT_ZONE_HINT).Magnitude < 12 then
+            return d.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+    return CFrame.new(SUBMIT_ZONE_HINT + Vector3.new(0, 3, 0))
+end
+
+local function getSafeBase()
+    local spawn = workspace:FindFirstChildWhichIsA("SpawnLocation")
+    if spawn then return CFrame.new(spawn.Position + Vector3.new(0, 5, 0)) end
+    return CFrame.new(SUBMIT_ZONE_HINT + Vector3.new(5, 3, 0))
+end
+
+local function submitAndPlace()
+    pcall(function()
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local submitCF = findSubmitZone()
+        root.CFrame = submitCF
+        task.wait(0.25)
+        root.CFrame = submitCF - Vector3.new(0, 1.3, 0)
+        task.wait(0.25)
+    end)
+    task.wait(0.2)
+
+    local ok = teleportToMyPlot()
+    if not ok then task.wait(1) return end
+    task.wait(0.6)
+
+    pcall(function()
+        local evFolder = ReplicatedStorage:FindFirstChild("Events")
+        local equipBest = evFolder and evFolder:FindFirstChild("EquipBest")
+        if equipBest then equipBest:FireServer() end
+    end)
+    task.wait(0.4)
+
+    pcall(function()
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        for _ = 1, maxCarry do
+            local best, bestDist = nil, 20
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") and v.Name:lower():find("place") then
+                    local p = v.Parent
+                    if p and p:IsA("BasePart") then
+                        local d = (p.Position - root.Position).Magnitude
+                        if d < bestDist then best = v bestDist = d end
+                    end
+                end
+            end
+            if best then
+                _fireprox(best)
+                task.wait(0.5)
+            else
+                break
+            end
+        end
+    end)
+    task.wait(0.3)
+end
+
+local function passesFarmFilters(obj)
+    if #selectedMutations > 0 then
+        local mutation = obj:GetAttribute("Mutation") or "Normal"
+        local ok = false
+        for _, m in ipairs(selectedMutations) do
+            if mutation == m then ok = true break end
+        end
+        if not ok then return false end
+    end
+    if #selectedTraits > 0 then
+        local td = traitData[obj]
+        if not td or #td.traitNames == 0 then return false end
+        local ok = false
+        for _, want in ipairs(selectedTraits) do
+            for _, have in ipairs(td.traitNames) do
+                if want == have then ok = true break end
+            end
+            if ok then break end
+        end
+        if not ok then return false end
+    end
+    return true
+end
+
+local function passesByNameFilter(obj)
+    if farmByNameFilter == "" then return false end
+    local displayName = (obj:GetAttribute("DisplayName") or obj.Name):lower()
+    return displayName:find(farmByNameFilter:lower(), 1, true) ~= nil
+end
+
+local function grabBrainrot(obj)
+    if not obj or not obj.Parent then return false end
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local part = obj:FindFirstChildWhichIsA("BasePart") or obj.PrimaryPart
+    if not part then return false end
+    safeTeleport(part.CFrame * CFrame.new(0, 4, 0))
+    task.wait(0.5)
+    local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        local originalHold = prompt.HoldDuration
+        local canWrite     = pcall(function() prompt.HoldDuration = 0 end)
+        _fireprox(prompt)
+        if canWrite then
+            task.wait(0.3)
+            pcall(function() prompt.HoldDuration = originalHold end)
+        else
+            task.wait(math.max(originalHold + 0.2, 0.7))
+        end
+        task.wait(0.3)
+    end
+    return true
+end
+
+local function pickFromFolder(folder)
+    for _, obj in ipairs(folder:GetChildren()) do
+        if passesFarmFilters(obj) then return obj end
+    end
+    return nil
+end
+
+local function collectOne(rarity, objOverride)
+    local folder = getBrainrotFolder(rarity)
+    if not folder then return end
+    local obj = objOverride
+    if not obj or not obj.Parent then obj = pickFromFolder(folder) end
+    if not obj or not obj.Parent then return end
+    if grabBrainrot(obj) then
+        pcall(submitAndPlace)
+    end
+end
+
+local function runRarityHopFarm(rarity, enabledKey, stoppedKey)
+    while getgenv()[enabledKey] and not getgenv()[stoppedKey] do
+        local folder = getBrainrotFolder(rarity)
+        if not folder then task.wait(2) continue end
+
+        local objs = {}
+        for _, obj in ipairs(folder:GetChildren()) do
+            if obj and obj.Parent then table.insert(objs, obj) end
+        end
+
+        if #objs == 0 then
+            if getgenv()[enabledKey] and not getgenv()[stoppedKey] then
+                task.wait(1)
+                task.spawn(function() smartHopGeneric(enabledKey, stoppedKey) end)
+            end
+            return
+        end
+
+        for _, obj in ipairs(objs) do
+            if not getgenv()[enabledKey] or getgenv()[stoppedKey] then return end
+            if obj and obj.Parent then
+                pcall(grabBrainrot, obj)
+                pcall(submitAndPlace)
+                task.wait(0.3)
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+local stopFarmLoop
+local function startFarm(rarities)
+    if collectorRunning then stopFarmLoop() task.wait(0.1) end
+    collectorRunning = true
+
+    collectorThread = task.spawn(function()
+        while collectorRunning do
+            if grabLock then task.wait(0.2) continue end
+
+            local snapshot = monitorData.brainrots
+            local raritySet = {}
+            for _, r in ipairs(rarities) do raritySet[r] = true end
+
+            local targets = {}
+            for _, entry in ipairs(snapshot) do
+                if raritySet[entry.rarity] and entry.obj and entry.obj.Parent then
+                    if passesFarmFilters(entry.obj) then
+                        table.insert(targets, entry)
+                    end
+                end
+            end
+
+            table.sort(targets, function(a, b)
+                return (RARITY_ORDER[a.rarity] or 99) < (RARITY_ORDER[b.rarity] or 99)
+            end)
+
+            if #targets == 0 then task.wait(1) continue end
+
+            local grabbed = 0
+            for _, entry in ipairs(targets) do
+                if not collectorRunning then break end
+                if grabLock then break end
+                if grabbed >= maxCarry then break end
+                if entry.obj and entry.obj.Parent then
+                    local ok, did = pcall(grabBrainrot, entry.obj)
+                    if ok and did then grabbed = grabbed + 1 end
+                end
+            end
+
+            if grabbed > 0 and collectorRunning and not grabLock then
+                pcall(submitAndPlace)
+            end
+
+            task.wait(0.2)
+        end
+    end)
+end
+
+stopFarmLoop = function()
+    collectorRunning = false
+    if collectorThread then task.cancel(collectorThread) collectorThread = nil end
+end
+
+local function scanWorld()
+    local found       = {}
+    local mutationMap = {}
+    for _, rarity in ipairs(ALL_RARITIES) do
+        local folder = getBrainrotFolder(rarity)
+        if folder then
+            for _, obj in ipairs(folder:GetChildren()) do
+                if obj and obj.Parent then
+                    local mutation    = obj:GetAttribute("Mutation") or "Normal"
+                    local displayName = obj:GetAttribute("DisplayName") or obj.Name
+                    local entry = { rarity = rarity, name = displayName, mutation = mutation, obj = obj }
+                    table.insert(found, entry)
+                    if mutation ~= "Normal" then
+                        table.insert(mutationMap, entry)
+                    end
+                end
+            end
+        end
+    end
+    monitorData.brainrots  = found
+    monitorData.mutations  = mutationMap
+    monitorData.totalCount = #found
+    monitorData.lastScan   = tick()
+    for obj in pairs(traitData) do
+        if not obj or not obj.Parent then traitData[obj] = nil end
+    end
+end
+
+local function startMonitor()
+    if monitorData.isRunning then return end
+    monitorData.isRunning = true
+    monitorThread = task.spawn(function()
+        while monitorData.isRunning do
+            pcall(scanWorld)
+            task.wait(1)
+        end
+    end)
+end
+
+local traitHookConn = nil
+local function initTraitHook()
+    local ok, traitEvent = pcall(function()
+        return ReplicatedStorage.Registries.TraitsRegistry.SetupTraitVFX
+    end)
+    if not ok or not traitEvent then return end
+    if traitHookConn then traitHookConn:Disconnect() end
+    traitHookConn = traitEvent.OnClientEvent:Connect(function(brainrotModel, vfxModule)
+        if not brainrotModel or not brainrotModel.Parent then return end
+        local traitName = ""
+        pcall(function() traitName = vfxModule.Name:gsub("VFX$", "") end)
+        if traitName == "" then return end
+        if not traitData[brainrotModel] then
+            traitData[brainrotModel] = {
+                obj        = brainrotModel,
+                traitNames = {},
+                name       = brainrotModel:GetAttribute("DisplayName") or brainrotModel.Name,
+                rarity     = (brainrotModel.Parent and brainrotModel.Parent.Name) or "Unknown",
+                mutation   = brainrotModel:GetAttribute("Mutation") or "Normal",
+            }
+        end
+        local already = false
+        for _, t in ipairs(traitData[brainrotModel].traitNames) do
+            if t == traitName then already = true break end
+        end
+        if not already then
+            table.insert(traitData[brainrotModel].traitNames, traitName)
+        end
+    end)
+end
+
+local allStates = {
+    Enum.HumanoidStateType.Climbing,     Enum.HumanoidStateType.FallingDown,
+    Enum.HumanoidStateType.Flying,       Enum.HumanoidStateType.Freefall,
+    Enum.HumanoidStateType.GettingUp,
+    Enum.HumanoidStateType.Landed,       Enum.HumanoidStateType.Physics,
+    Enum.HumanoidStateType.PlatformStanding, Enum.HumanoidStateType.Ragdoll,
+    Enum.HumanoidStateType.Running,      Enum.HumanoidStateType.RunningNoPhysics,
+    Enum.HumanoidStateType.Seated,       Enum.HumanoidStateType.StrafingNoPhysics,
+    Enum.HumanoidStateType.Swimming,
+}
+
+local function setHumanoidStates(enabled)
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    for _, state in ipairs(allStates) do hum:SetStateEnabled(state, enabled) end
+
+    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+    if enabled then
+        hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+    else
+        hum:ChangeState(Enum.HumanoidStateType.Swimming)
+    end
+end
+
+local startFlySystem, stopFlySystem
+local flyInputConnections = {}
+
+startFlySystem = function()
+    local chr = player.Character
+    if not chr then return end
+    nowe      = true
+    tpwalking = false
+
+    for _ = 1, speeds do
+        task.spawn(function()
+            tpwalking = true
+            local c = player.Character
+            local h = c and c:FindFirstChildWhichIsA("Humanoid")
+            while tpwalking and RunService.Heartbeat:Wait() and c and h and h.Parent do
+                if h.MoveDirection.Magnitude > 0 then c:TranslateBy(h.MoveDirection) end
+            end
+        end)
+    end
+
+    pcall(function()
+        chr.Animate.Disabled = true
+        local hum2 = chr:FindFirstChildOfClass("Humanoid") or chr:FindFirstChildOfClass("AnimationController")
+        if hum2 then
+            for _, track in next, hum2:GetPlayingAnimationTracks() do track:AdjustSpeed(0) end
+        end
+    end)
+
+    setHumanoidStates(false)
+
+    local hum     = chr:FindFirstChildOfClass("Humanoid")
+    local rigType = hum and hum.RigType
+    local torso   = (rigType == Enum.HumanoidRigType.R6)
+                    and chr:FindFirstChild("Torso")
+                    or  chr:FindFirstChild("UpperTorso")
+    if not torso then return end
+
+    local bg = Instance.new("BodyGyro", torso)
+    bg.P           = 9e4
+    bg.maxTorque   = Vector3.new(9e9, 9e9, 9e9)
+    bg.cframe      = torso.CFrame
+
+    local bv = Instance.new("BodyVelocity", torso)
+    bv.velocity  = Vector3.new(0, 0.1, 0)
+    bv.maxForce  = Vector3.new(9e9, 9e9, 9e9)
+
+    hum.PlatformStand = true
+
+    local ctrl     = {f=0, b=0, l=0, r=0}
+    local lastctrl = {f=0, b=0, l=0, r=0}
+    local maxspeed = 50
+    local spd      = 0
+
+    task.spawn(function()
+        while nowe do
+            if rigType == Enum.HumanoidRigType.R6 then
+                RunService.RenderStepped:Wait()
+            else
+                task.wait()
+            end
+            if ctrl.l+ctrl.r ~= 0 or ctrl.f+ctrl.b ~= 0 then
+                spd = math.min(spd + 0.5 + (spd/maxspeed), maxspeed)
+            elseif spd ~= 0 then
+                spd = math.max(spd - 1, 0)
+            end
+            local cam = workspace.CurrentCamera.CoordinateFrame
+            if (ctrl.l+ctrl.r) ~= 0 or (ctrl.f+ctrl.b) ~= 0 then
+                bv.velocity = ((cam.lookVector*(ctrl.f+ctrl.b)) + ((cam*CFrame.new(ctrl.l+ctrl.r,(ctrl.f+ctrl.b)*.2,0).p) - cam.p)) * spd
+                lastctrl = {f=ctrl.f, b=ctrl.b, l=ctrl.l, r=ctrl.r}
+            elseif spd ~= 0 then
+                bv.velocity = ((cam.lookVector*(lastctrl.f+lastctrl.b)) + ((cam*CFrame.new(lastctrl.l+lastctrl.r,(lastctrl.f+lastctrl.b)*.2,0).p) - cam.p)) * spd
+            else
+                bv.velocity = Vector3.new(0, 0, 0)
+            end
+            bg.cframe = workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f+ctrl.b)*50*spd/maxspeed), 0, 0)
+        end
+        bg:Destroy()
+        bv:Destroy()
+        pcall(function()
+            hum.PlatformStand    = false
+            chr.Animate.Disabled = false
+        end)
+        tpwalking = false
+    end)
+
+    task.spawn(function()
+        while nowe do
+            task.wait()
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                if upHeld   then root.CFrame = root.CFrame * CFrame.new(0,  1, 0) end
+                if downHeld then root.CFrame = root.CFrame * CFrame.new(0, -1, 0) end
+            end
+        end
+    end)
+
+    table.insert(flyInputConnections, UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.W then ctrl.f =  1 end
+        if input.KeyCode == Enum.KeyCode.S then ctrl.b = -1 end
+        if input.KeyCode == Enum.KeyCode.A then ctrl.l = -1 end
+        if input.KeyCode == Enum.KeyCode.D then ctrl.r =  1 end
+    end))
+    table.insert(flyInputConnections, UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.W then ctrl.f = 0 end
+        if input.KeyCode == Enum.KeyCode.S then ctrl.b = 0 end
+        if input.KeyCode == Enum.KeyCode.A then ctrl.l = 0 end
+        if input.KeyCode == Enum.KeyCode.D then ctrl.r = 0 end
+    end))
+end
+
+stopFlySystem = function()
+    nowe      = false
+    tpwalking = false
+    for _, c in ipairs(flyInputConnections) do c:Disconnect() end
+    flyInputConnections = {}
+    setHumanoidStates(true)
+    pcall(function()
+        if player.Character then player.Character.Animate.Disabled = false end
+    end)
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Q then upHeld   = true  end
+    if input.KeyCode == Enum.KeyCode.E then downHeld = true  end
+
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if getgenv().OxyoAutoHopCoin or getgenv().OxyoAutoHopGodly or getgenv().OxyoAutoHopCel then
+            nuclearStop()
+        end
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Q then upHeld   = false end
+    if input.KeyCode == Enum.KeyCode.E then downHeld = false end
+end)
+
+local function duplicateEquipped()
+    local char = player.Character
+    if not char then return false, "No character found." end
+    local tool = nil
+    for _, obj in ipairs(char:GetChildren()) do
+        if obj:IsA("Tool") then tool = obj break end
+    end
+    if not tool then return false, "No Brainrot equipped." end
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return false, "No backpack found." end
+    local clone = tool:Clone()
+    clone.Parent = backpack
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then hum:UnequipTools() end
+    return true, "Duplicated: " .. tool.Name
+end
+
+local function getPlotBrainrotCount()
+    local count = 0
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, v in pairs(backpack:GetChildren()) do
+            if v:IsA("Tool") then count = count + 1 end
+        end
+    end
+    local char = player.Character
+    if char then
+        for _, v in pairs(char:GetChildren()) do
+            if v:IsA("Tool") then count = count + 1 end
+        end
+    end
+    return count
+end
+
+local function getSellRemote()
+    local events = ReplicatedStorage:FindFirstChild("Events")
+    if not events then return nil end
+    local r = events:FindFirstChild("SellDialogue")
+    if r then return r end
+    for _, v in pairs(events:GetChildren()) do
+        if v.Name:lower():find("sell") then return v end
+    end
+    return nil
+end
+
+local function doSell()
+    local remote = getSellRemote()
+    if not remote then
+        warn("[AutoSell] Remote not found in ReplicatedStorage.Events!")
+        return false
+    end
+    local ok, err = pcall(function()
+        if remote:IsA("RemoteFunction") then
+            remote:InvokeServer("SellAll")
+        elseif remote:IsA("RemoteEvent") then
+            remote:FireServer("SellAll")
+        end
+    end)
+    if not ok then warn("[AutoSell] Fire failed:", tostring(err)) end
+    return ok
+end
+
+local function attachPlotCounter(plot)
+    if countConn then countConn:Disconnect() end
+    playerPlot     = plot
+    collectedCount = 0
+    local br = plot:FindFirstChild("Brainrots")
+    if not br then return end
+    countConn = br.ChildAdded:Connect(function(child)
+        if child:IsA("Model") then
+            collectedCount = collectedCount + 1
+        end
+    end)
+end
+
+local function isValidPos(pos)
+    return math.abs(pos.X) < 5000 and math.abs(pos.Y) < 5000 and math.abs(pos.Z) < 5000
+end
+
+local function getLuckyBlocks()
+    local gf = workspace:FindFirstChild("GameFolder")
+    local lb = gf and gf:FindFirstChild("LuckyBlocks")
+    if not lb then return {} end
+    local result = {}
+    for _, block in ipairs(lb:GetChildren()) do
+        local pp     = block:FindFirstChildWhichIsA("ProximityPrompt", true)
+        local active = false
+        local pos    = Vector3.new(0, 0, 0)
+        if pp then
+            pos    = pp.Parent.Position
+            active = isValidPos(pos)
+        end
+        table.insert(result, { name = block.Name, active = active, pos = pos, block = block, pp = pp })
+    end
+    return result
+end
+
+local function shouldFireLucky(blockName)
+    if auto.luckyType == "All" then return true end
+    return blockName == auto.luckyType
+end
+
+local function tryFireBlock(block)
+    if not auto.luckyEnabled then return end
+    if not shouldFireLucky(block.Name) then return end
+    pcall(function()
+        local pp = block:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if not pp then return end
+        local pos = pp.Parent.Position
+        if not isValidPos(pos) then return end
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 3))
+        task.wait(0.3)
+        _fireprox(pp)
+        task.wait(0.5)
+        root.CFrame = getSafeBase()
+    end)
+end
+
+local BUY_RESULT = {
+    SUCCESS      = "success",
+    OUT_OF_STOCK = "out_of_stock",
+    NO_COINS     = "no_coins",
+    NOT_IN_SHOP  = "not_in_shop",
+}
+
+local function getGearsInShop()
+    local gf = workspace:FindFirstChild("GameFolder")
+    local ga = gf and gf:FindFirstChild("Shops")
+             and gf.Shops:FindFirstChild("Vendor")
+             and gf.Shops.Vendor:FindFirstChild("GearsAccess")
+    if not ga then return {} end
+    local names = {}
+    for _, v in pairs(ga:GetChildren()) do
+        names[v.Name:lower()] = true
+    end
+    return names
+end
+
+local function getCoins()
+    local ls = player:FindFirstChild("leaderstats")
+    if not ls then return math.huge end
+    local coins = ls:FindFirstChild("Coins") or ls:FindFirstChild("Coin") or ls:FindFirstChild("Cash")
+    if not coins then return math.huge end
+    return tonumber(coins.Value) or 0
+end
+
+local function buyGear(gearKey)
+    local data = GEAR_REGISTRY[gearKey]
+    if not data then return BUY_RESULT.NOT_IN_SHOP end
+
+    local remote = ReplicatedStorage:FindFirstChild("VendorPurchase", true)
+                or (ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("VendorPurchase"))
+    if not remote then return BUY_RESULT.NOT_IN_SHOP end
+
+    local backpack    = player:FindFirstChild("Backpack")
+    local toolsBefore = {}
+    if backpack then
+        for _, v in pairs(backpack:GetChildren()) do
+            if v:IsA("Tool") then toolsBefore[v] = true end
+        end
+    end
+
+    auto.lastNotif = ""
+    pcall(function() remote:FireServer(data.serverKey) end)
+
+    local waited = 0
+    while waited < 1.5 do
+        task.wait(0.1)
+        waited = waited + 0.1
+        if auto.lastNotif ~= "" then break end
+
+        if backpack then
+            for _, v in pairs(backpack:GetChildren()) do
+                if v:IsA("Tool") and not toolsBefore[v] then
+                    Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
+                    return BUY_RESULT.SUCCESS
+                end
+            end
+        end
+    end
+
+    local notif = auto.lastNotif:lower()
+
+    if notif:find("out of stock") or notif:find("stock") then
+        return BUY_RESULT.OUT_OF_STOCK
+    elseif notif:find("not enough") or notif:find("afford") or notif:find("coins") then
+        return BUY_RESULT.NO_COINS
+    end
+
+    if backpack then
+        for _, v in pairs(backpack:GetChildren()) do
+            if v:IsA("Tool") and not toolsBefore[v] then
+                Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName, Duration = 3, Image = 4483362458 })
+                return BUY_RESULT.SUCCESS
+            end
+        end
+    end
+
+    return BUY_RESULT.NOT_IN_SHOP
+end
+
+local function applyJumpFix(hum)
+    if not hum then return end
+    local function enforce()
+        if hum.Health <= 0 then return end
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        if not jumpEnabled and hum.JumpPower <= 0 then
+            hum.JumpPower = 50
+        end
+    end
+    enforce()
+    hum:GetPropertyChangedSignal("JumpPower"):Connect(enforce)
+end
+
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid  = char:WaitForChild("Humanoid")
+    rootPart  = char:WaitForChild("HumanoidRootPart")
+    task.wait(0.5)
+    if humanoid then
+        applyJumpFix(humanoid)
+        if speedEnabled then humanoid.WalkSpeed = currentSpeed end
+        if jumpEnabled  then humanoid.JumpPower  = currentJumpPower end
+    end
+    if flyEnabled then task.wait(0.3) startFlySystem() end
+end)
+
+pcall(function()
+    if humanoid then applyJumpFix(humanoid) end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    pcall(function()
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        if infinityJumpEnabled then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+end)
+
+startMonitor()
+initTraitHook()
+
+pcall(function()
+    ReplicatedStorage.Events.Notification.OnClientEvent:Connect(function(msg)
+        if type(msg) == "string" then auto.lastNotif = msg end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if noclipEnabled and character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if speedEnabled or jumpEnabled then
+            pcall(function()
+                local hum = character and character:FindFirstChild("Humanoid")
+                if not hum then return end
+                if speedEnabled then hum.WalkSpeed = currentSpeed end
+                if jumpEnabled  then hum.JumpPower  = currentJumpPower end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not hitboxEnabled then continue end
+        for _, v in next, Players:GetPlayers() do
+            if v ~= player then
+                pcall(function()
+                    local root = v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.Size         = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                        root.Transparency = hitboxTransp
+                        root.BrickColor   = hitboxColor
+                        root.Material     = Enum.Material.Neon
+                        root.CanCollide   = false
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+MainTab:CreateSection("Remove Objects")
+
+MainTab:CreateButton({
+    Name     = "Remove Lava",
+    Callback = function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name == "Lavas" or v.Name == "Lava" then
+                pcall(function() v:Destroy() end)
+            end
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name     = "Remove VIP Walls",
+    Callback = function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name == "VIPDoors" or v.Name == "VIPDoor" or v.Name == "VIPWall" then
+                pcall(function() v:Destroy() end)
+            end
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name     = "Remove Killbricks",
+    Callback = function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                local name = v.Name:lower()
+                if name:find("kill") or name:find("damage") or name:find("death") or
+                   name:find("void") or name:find("lava") or
+                   v.BrickColor == BrickColor.new("Really red") then
+                    pcall(function() v:Destroy() end)
+                end
+            end
+        end
+    end,
+})
+
+MainTab:CreateSection("My Plot")
+
+MainTab:CreateButton({
+    Name     = "Teleport to My Plot",
+    Callback = function()
+        local ok = teleportToMyPlot()
+        if not ok then
+            Rayfield:Notify({ Title = "Plot", Content = "Could not find your plot.", Duration = 3, Image = 4483362458 })
+        end
+    end,
+})
+
+MainTab:CreateSection("Utilities")
+
+MainTab:CreateButton({
+    Name     = "Reset Config",
+    Callback = function()
+        local togglesOff = {
+            "InstantGrab","NoClip","SpeedEnabled","JumpEnabled","InfinityJump",
+            "AutoMeteor","AutoLuckyBlock","AutoSpinWheel","AutoFarmToggle",
+            "AutoFarmNameToggle","AutoMoney","AutoCoin","AutoHopCoin",
+            "AutoUpgrade","AutoSell","MutationAlert","AutoBuyGear",
+            "AutoCheese","AutoFeedSteak","HitboxToggle","FullBright",
+            "InfiniteZoom","PlayerESP","CelestialESP",
+        }
+        local slidersDefault = {
+            SpeedSlider = 16, JumpSlider = 50, FlySpeed = 1,
+            MaxCarrySlider = 1, SellThreshold = 50, SellTimerInterval = 0,
+            HitboxSize = 50, HitboxTransp = 7,
+        }
+        local dropdownsDefault = {
+            RarityDropdown = {}, MutationDropdown = {}, TraitDropdown = {},
+            LuckyBlockType = {"All"}, HitboxColor = {"Really blue"},
+            GearDropdown = {}, MutationAlertDropdown = {},
+        }
+
+        for _, flag in ipairs(togglesOff) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(false)
+                end
+            end)
+        end
+        for flag, val in pairs(slidersDefault) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(val)
+                end
+            end)
+        end
+        for flag, val in pairs(dropdownsDefault) do
+            pcall(function()
+                if Rayfield.Flags[flag] then
+                    Rayfield.Flags[flag]:Set(val)
+                end
+            end)
+        end
+
+        pcall(function() Rayfield:ResetConfiguration() end)
+        Rayfield:Notify({ Title = "Config Reset", Content = "All settings reset to default.", Duration = 3, Image = 4483362458 })
+    end,
+})
+
+MainTab:CreateButton({
+    Name     = "Rejoin Server",
+    Callback = function()
+        task.wait(1)
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+        end)
+    end,
+})
+
+MainTab:CreateButton({
+    Name     = "Server Hop",
+    Callback = function()
+        task.wait(1)
+        pcall(function()
+            TeleportService:Teleport(game.PlaceId, player)
+        end)
+    end,
+})
+
+MainTab:CreateSection("Instant Grab")
+
+MainTab:CreateToggle({
+    Name         = "Instant Grab",
+    CurrentValue = false,
+    Flag         = "InstantGrab",
+    Callback     = function(Value)
+        instantGrabEnabled = Value
+        if Value then
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") then
+                    if not OriginalHoldTimes[v] then OriginalHoldTimes[v] = v.HoldDuration end
+                    v.HoldDuration = 0
+                end
+            end
+            instantGrabConnection = workspace.DescendantAdded:Connect(function(v)
+                if v:IsA("ProximityPrompt") then
+                    task.wait()
+                    if not OriginalHoldTimes[v] then OriginalHoldTimes[v] = v.HoldDuration end
+                    v.HoldDuration = 0
+                end
+            end)
+        else
+            if instantGrabConnection then
+                instantGrabConnection:Disconnect()
+                instantGrabConnection = nil
+            end
+            for prompt, originalTime in pairs(OriginalHoldTimes) do
+                if prompt and prompt.Parent then prompt.HoldDuration = originalTime end
+            end
+            OriginalHoldTimes = {}
+        end
+    end,
+})
+
+MainTab:CreateSection("Movement")
+
+MainTab:CreateToggle({
+    Name         = "NoClip",
+    CurrentValue = false,
+    Flag         = "NoClip",
+    Callback     = function(Value) noclipEnabled = Value end,
+})
+
+MainTab:CreateSection("Player")
+
+MainTab:CreateToggle({
+    Name         = "Speed On/Off",
+    CurrentValue = false,
+    Flag         = "SpeedEnabled",
+    Callback     = function(Value)
+        speedEnabled = Value
+        pcall(function()
+            if character and character:FindFirstChild("Humanoid") then
+                if speedEnabled then
+
+                    originalSpeed = character.Humanoid.WalkSpeed
+                    character.Humanoid.WalkSpeed = currentSpeed
+                else
+
+                    character.Humanoid.WalkSpeed = originalSpeed or getGameSpeed()
+                    originalSpeed = nil
+                end
+            end
+        end)
+    end,
+})
+
+MainTab:CreateSlider({
+    Name         = "Walk Speed",
+    Range        = {16, 200},
+    Increment    = 1,
+    Suffix       = "Speed",
+    CurrentValue = 16,
+    Flag         = "SpeedSlider",
+    Callback     = function(Value)
+        currentSpeed = Value
+        if speedEnabled then
+            pcall(function()
+                if character and character:FindFirstChild("Humanoid") then
+                    character.Humanoid.WalkSpeed = currentSpeed
+                end
+            end)
+        end
+    end,
+})
+
+MainTab:CreateToggle({
+    Name         = "Jump Power On/Off",
+    CurrentValue = false,
+    Flag         = "JumpEnabled",
+    Callback     = function(Value)
+        jumpEnabled = Value
+        pcall(function()
+            if character and character:FindFirstChild("Humanoid") then
+                if jumpEnabled then
+                    originalJump = character.Humanoid.JumpPower
+                    character.Humanoid.JumpPower = currentJumpPower
+                else
+                    character.Humanoid.JumpPower = originalJump or getGameJump()
+                    originalJump = nil
+                end
+            end
+        end)
+    end,
+})
+
+MainTab:CreateSlider({
+    Name         = "Jump Power",
+    Range        = {50, 300},
+    Increment    = 1,
+    Suffix       = "Power",
+    CurrentValue = 50,
+    Flag         = "JumpSlider",
+    Callback     = function(Value)
+        currentJumpPower = Value
+        if jumpEnabled then
+            pcall(function()
+                if character and character:FindFirstChild("Humanoid") then
+                    character.Humanoid.JumpPower = currentJumpPower
+                end
+            end)
+        end
+    end,
+})
+
+MainTab:CreateToggle({
+    Name         = "Infinity Jump",
+    CurrentValue = false,
+    Flag         = "InfinityJump",
+    Callback     = function(Value) infinityJumpEnabled = Value end,
+})
+
+MainTab:CreateSection("Fly")
+
+MainTab:CreateToggle({
+    Name         = "Enable Fly  (Q = Up | E = Down)",
+    CurrentValue = false,
+    Callback     = function(Value)
+        flyEnabled = Value
+        if Value then startFlySystem() else stopFlySystem() end
+    end,
+})
+
+MainTab:CreateSlider({
+    Name         = "Fly Speed",
+    Range        = {1, 10},
+    Increment    = 1,
+    Suffix       = "x",
+    CurrentValue = 1,
+    Flag         = "FlySpeed",
+    Callback     = function(Value)
+        speeds    = Value
+        if nowe then
+            tpwalking = false
+            task.wait(0.1)
+            for _ = 1, speeds do
+                task.spawn(function()
+                    tpwalking = true
+                    local c = player.Character
+                    local h = c and c:FindFirstChildWhichIsA("Humanoid")
+                    while tpwalking and RunService.Heartbeat:Wait() and c and h and h.Parent do
+                        if h.MoveDirection.Magnitude > 0 then c:TranslateBy(h.MoveDirection) end
+                    end
+                end)
+            end
+        end
+    end,
+})
+
+MainTab:CreateSection("Duplicate Brainrot")
+
+MainTab:CreateButton({
+    Name     = "Duplicate Equipped Brainrot",
+    Callback = function()
+        local success, msg = duplicateEquipped()
+        Rayfield:Notify({ Title = "Duplicate", Content = msg, Duration = 3, Image = 4483362458 })
+    end,
+})
+
+CollectorTab:CreateSection("Auto Meteor")
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Teleport to Meteor",
+    CurrentValue = false,
+    Flag         = "AutoMeteor",
+    Callback     = function(Value)
+        auto.meteorEnabled = Value
+        if Value then
+            hideLava()
+            auto.meteorThread = task.spawn(function()
+                while auto.meteorEnabled do
+                    pcall(function()
+                        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        if not root then return end
+                        local bestMeteor, bestDist = nil, math.huge
+                        for _, obj in ipairs(workspace:GetChildren()) do
+                            if obj.Name == "Meteor" then
+                                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                                if part then
+                                    local dist = (part.Position - root.Position).Magnitude
+                                    if dist < bestDist then
+                                        bestMeteor = part
+                                        bestDist   = dist
+                                    end
+                                end
+                            end
+                        end
+                        if bestMeteor then
+                            local vel = bestMeteor.AssemblyLinearVelocity
+                            local pos = bestMeteor.Position
+                            local landPos
+                            if vel and vel.Y < -1 then
+                                local t = math.max(0, (pos.Y - 5) / (-vel.Y))
+                                landPos = Vector3.new(pos.X + vel.X * t, 5, pos.Z + vel.Z * t)
+                            else
+                                landPos = Vector3.new(pos.X, pos.Y + 3, pos.Z)
+                            end
+                            root.CFrame = CFrame.new(landPos)
+                        end
+                    end)
+                    task.wait(0.05)
+                end
+            end)
+        else
+            if auto.meteorThread then task.cancel(auto.meteorThread) auto.meteorThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Auto Lucky Block")
+
+local LUCKY_OPTIONS = { "All" }
+for _, t in ipairs(LUCKY_TYPES) do
+    if t ~= "LuckyBlock" then table.insert(LUCKY_OPTIONS, t) end
+end
+
+CollectorTab:CreateDropdown({
+    Name          = "Block Type",
+    Options       = LUCKY_OPTIONS,
+    CurrentOption = { "All" },
+    Flag          = "LuckyBlockType",
+    Callback      = function(opt)
+        auto.luckyType = type(opt) == "table" and opt[1] or opt
+    end,
+})
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Lucky Block",
+    CurrentValue = false,
+    Flag         = "AutoLuckyBlock",
+    Callback     = function(Value)
+        auto.luckyEnabled = Value
+        if Value then
+            hideLava()
+            local gf = workspace:FindFirstChild("GameFolder")
+            local lb = gf and gf:FindFirstChild("LuckyBlocks")
+            if not lb then
+                Rayfield:Notify({ Title = "Auto Lucky Block", Content = "LuckyBlocks folder not found!", Duration = 4, Image = 4483362458 })
+                auto.luckyEnabled = false
+                return
+            end
+            for _, block in ipairs(lb:GetChildren()) do
+                task.spawn(tryFireBlock, block)
+            end
+            if auto.luckyConn then auto.luckyConn:Disconnect() end
+            auto.luckyConn = lb.ChildAdded:Connect(function(block)
+                if auto.luckyEnabled then
+                    task.wait(0.5)
+                    task.spawn(tryFireBlock, block)
+                end
+            end)
+            task.spawn(function()
+                while auto.luckyEnabled do
+                    task.wait(1)
+                    pcall(function()
+                        for _, block in ipairs(lb:GetChildren()) do
+                            if not auto.luckyEnabled then break end
+                            local pp = block:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if pp and isValidPos(pp.Parent.Position) and shouldFireLucky(block.Name) then
+                                task.spawn(tryFireBlock, block)
+                            end
+                        end
+                    end)
+                end
+            end)
+        else
+            if auto.luckyConn then auto.luckyConn:Disconnect() auto.luckyConn = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Auto Spin Wheel")
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Spin Wheel",
+    CurrentValue = false,
+    Flag         = "AutoSpinWheel",
+    Callback     = function(Value)
+        auto.spinEnabled = Value
+        if Value then
+            auto.spinThread = task.spawn(function()
+                while auto.spinEnabled do
+                    pcall(function()
+                        ReplicatedStorage
+                            :WaitForChild("Remotes", 10)
+                            :WaitForChild("SpinWheel", 10)
+                            :WaitForChild("RequestSpin", 10)
+                            :FireServer()
+                    end)
+                    task.wait(0.76)
+                end
+            end)
+        else
+            if auto.spinThread then task.cancel(auto.spinThread) auto.spinThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Filters")
+
+CollectorTab:CreateDropdown({
+    Name            = "Select Rarities",
+    Options         = {"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"},
+    CurrentOption   = {},
+    MultipleOptions = true,
+    Flag            = "RarityDropdown",
+    Callback        = function(Options) selectedRarities = Options end,
+})
+
+CollectorTab:CreateDropdown({
+    Name            = "Select Mutations  (empty = all)",
+    Options         = {"Gold","Emerald","Diamond","Cheese","Bloodmoon","Rainbow"},
+    CurrentOption   = {},
+    MultipleOptions = true,
+    Flag            = "MutationDropdown",
+    Callback        = function(Options) selectedMutations = Options end,
+})
+
+CollectorTab:CreateDropdown({
+    Name            = "Select Traits  (empty = all)",
+    Options         = ALL_TRAITS,
+    CurrentOption   = {},
+    MultipleOptions = true,
+    Flag            = "TraitDropdown",
+    Callback        = function(Options) selectedTraits = Options end,
+})
+
+CollectorTab:CreateSection("Carry Settings")
+
+CollectorTab:CreateSlider({
+    Name         = "Max Carry",
+    Range        = {1, 6},
+    Increment    = 1,
+    Suffix       = "Brainrots",
+    CurrentValue = 1,
+    Flag         = "MaxCarrySlider",
+    Callback     = function(Value)
+        maxCarry = Value
+    end,
+})
+
+CollectorTab:CreateSection("Auto Collector")
+
+CollectorTab:CreateToggle({
+    Name         = "Start Auto Farm",
+    CurrentValue = false,
+    Flag         = "AutoFarmToggle",
+    Callback     = function(Value)
+        if Value then
+            hideLava()
+            if #selectedRarities == 0 then
+                Rayfield:Notify({ Title = "Auto Farm", Content = "Select at least one Rarity first!", Duration = 4, Image = 4483362458 })
+                pcall(function() if Rayfield.Flags["AutoFarmToggle"] then Rayfield.Flags["AutoFarmToggle"]:Set(false) end end)
+                return
+            end
+            local plot = getPlayerPlot()
+            if plot then attachPlotCounter(plot) end
+            startFarm(selectedRarities)
+        else
+            stopFarmLoop()
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Farm by Name")
+
+CollectorTab:CreateInput({
+    Name                    = "Brainrot Name",
+    PlaceholderText         = "e.g. BrrBrr",
+    RemoveTextAfterFocusLost = false,
+    Callback                = function(Value) farmByNameFilter = Value or "" end,
+})
+
+CollectorTab:CreateButton({
+    Name     = "Farm Selected Brainrot  (one pass)",
+    Callback = function()
+        if farmByNameFilter == "" then
+            Rayfield:Notify({ Title = "Farm by Name", Content = "Type a Brainrot name first!", Duration = 4, Image = 4483362458 })
+            return
+        end
+        pcall(scanWorld)
+        local found = false
+        for _, entry in ipairs(monitorData.brainrots) do
+            if entry.obj and entry.obj.Parent and passesByNameFilter(entry.obj) then
+                found = true
+                Rayfield:Notify({ Title = "Found!", Content = entry.name .. " (" .. entry.rarity .. ") — collecting...", Duration = 3, Image = 4483362458 })
+                local e = entry
+                task.spawn(function() pcall(function() collectOne(e.rarity, e.obj) end) end)
+                break
+            end
+        end
+        if not found then
+            Rayfield:Notify({ Title = "Not Spawned", Content = "\"" .. farmByNameFilter .. "\" not found in world.", Duration = 4, Image = 4483362458 })
+        end
+    end,
+})
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Farm Selected Brainrot  (monitor)",
+    CurrentValue = false,
+    Flag         = "AutoFarmNameToggle",
+    Callback     = function(Value)
+        autoNameEnabled = Value
+        if Value then
+            hideLava()
+            if farmByNameFilter == "" then
+                Rayfield:Notify({ Title = "Auto Farm by Name", Content = "Type a Brainrot name first!", Duration = 4, Image = 4483362458 })
+                autoNameEnabled = false
+                pcall(function() if Rayfield.Flags["AutoFarmNameToggle"] then Rayfield.Flags["AutoFarmNameToggle"]:Set(false) end end)
+                return
+            end
+            autoNameThread = task.spawn(function()
+                while autoNameEnabled do
+                    if grabLock then task.wait(0.2) continue end
+                    local snapshot = monitorData.brainrots
+                    local collected = false
+                    for _, entry in ipairs(snapshot) do
+                        if not autoNameEnabled then break end
+                        if grabLock then break end
+                        if entry.obj and entry.obj.Parent and passesByNameFilter(entry.obj) then
+                            collected = true
+                            local e = entry
+                            pcall(function() collectOne(e.rarity, e.obj) end)
+                            task.wait(0.5)
+                            break
+                        end
+                    end
+                    if not collected then task.wait(1) end
+                end
+            end)
+        else
+            if autoNameThread then task.cancel(autoNameThread) autoNameThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Auto Money")
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Collect Money",
+    CurrentValue = false,
+    Flag         = "AutoMoney",
+    Callback     = function(Value)
+        auto.moneyEnabled = Value
+        if Value then
+            auto.moneyThread = task.spawn(function()
+                while auto.moneyEnabled do
+                    pcall(function()
+                        local gf = workspace:FindFirstChild("GameFolder")
+                        local plots = gf and gf:FindFirstChild("Plots")
+                        if not plots then return end
+                        for _, plot in pairs(plots:GetChildren()) do
+                            local brainrots = plot:FindFirstChild("Brainrots")
+                            if not brainrots then continue end
+                            for _, br in pairs(brainrots:GetChildren()) do
+                                local ok, owner = pcall(function() return br:GetAttribute("Owner") end)
+                                if ok and owner and tostring(owner) == tostring(player.UserId) then
+                                    local places = plot:FindFirstChild("Places")
+                                    if places then
+                                        for _, place in pairs(places:GetChildren()) do
+                                            local claim = place:FindFirstChild("Claim")
+                                            if claim and claim:IsA("BasePart") then
+                                                local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                                                if root then
+                                                    _firetouchinterest(root, claim, 0)
+                                                    task.wait(0.05)
+                                                    _firetouchinterest(root, claim, 1)
+                                                    task.wait(0.1)
+                                                end
+                                            end
+                                        end
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        else
+            if auto.moneyThread then task.cancel(auto.moneyThread) auto.moneyThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Auto Coin")
+
+local coinEventActive   = false
+local coinCollectThread = nil
+
+local nuclearStop
+
+local function findCoins()
+    local coins = {}
+    local seen  = {}
+    for _, obj in pairs(workspace:GetDescendants()) do
+        local lname = obj.Name:lower()
+        if lname == "coin" or lname == "coinmodel" or lname == "coin_model" or lname:sub(1, 4) == "coin" then
+            local part
+            if obj:IsA("BasePart") then
+                part = obj
+            elseif obj:IsA("Model") then
+                part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            end
+            if part and not seen[part] then
+                seen[part] = true
+                table.insert(coins, part)
+            end
+        end
+    end
+    return coins
+end
+
+local _coinHopDone = false
+
+local function startCoinCollect()
+    if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+    _coinHopDone    = false
+    coinEventActive = true
+    coinCollectThread = task.spawn(function()
+        local deadline    = tick() + coinEventDuration
+        local idleTicks   = 0
+        while autoCoinEnabled and (not autoHopCoinEnabled or not getgenv().OxyoHopStopped) do
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not root then task.wait(0.3) continue end
+
+            local coins = findCoins()
+
+            if #coins == 0 then
+                idleTicks = idleTicks + 1
+                if tick() > deadline and idleTicks > 6 then
+                    break
+                end
+                task.wait(0.3)
+                continue
+            end
+
+            idleTicks = 0
+            deadline  = math.max(deadline, tick() + 8)
+
+            table.sort(coins, function(a, b)
+                local ra = root and (a.Position - root.Position).Magnitude or 0
+                local rb = root and (b.Position - root.Position).Magnitude or 0
+                return ra < rb
+            end)
+
+            for _, part in ipairs(coins) do
+                if not autoCoinEnabled then break end
+                if not part or not part.Parent then continue end
+                root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if not root then break end
+                safeTeleport(CFrame.new(part.Position + Vector3.new(0, 3, 0)))
+                task.wait(0.55)
+            end
+        end
+
+        coinEventActive   = false
+        coinCollectThread = nil
+
+        if autoHopCoinEnabled and autoCoinEnabled and not _coinHopDone and not getgenv().OxyoHopStopped then
+            _coinHopDone = true
+            Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain ended — hopping...", Duration = 2, Image = 4483362458 })
+            task.wait(1)
+            if not getgenv().OxyoHopStopped and autoHopCoinEnabled then
+                getgenv().OxyoAutoHopCoin = true
+                task.spawn(smartHop)
+            end
+        end
+    end)
+end
+
+local _notifConnected = {}
+local function _tryConnectNotif(remote)
+    if _notifConnected[remote] then return end
+    _notifConnected[remote] = true
+    remote.OnClientEvent:Connect(function(msg)
+        if type(msg) ~= "string" then return end
+        local lower = msg:lower()
+        if lower:find("coin") and (lower:find("rain") or lower:find("start") or lower:find("event")) then
+            local secs = msg:match("(%d+)")
+            coinEventDuration = tonumber(secs) or 90
+            if autoCoinEnabled and not coinEventActive then
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Started — farming!", Duration = 3, Image = 4483362458 })
+                startCoinCollect()
+            end
+        end
+    end)
+end
+
+task.spawn(function()
+    local _notifPaths = {
+        {"Events","Notification"},{"Remotes","Notification"},
+        {"Events","CoinRain"},{"Remotes","CoinRain"},
+        {"Events","SystemNotification"},{"Remotes","SystemNotification"},
+    }
+    for _, path in ipairs(_notifPaths) do
+        pcall(function()
+            local parent = ReplicatedStorage
+            for i = 1, #path - 1 do
+                local c = parent:FindFirstChild(path[i]) or parent:WaitForChild(path[i], 3)
+                if not c then return end
+                parent = c
+            end
+            local remote = parent:FindFirstChild(path[#path])
+            if remote and remote:IsA("RemoteEvent") then _tryConnectNotif(remote) end
+        end)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if autoCoinEnabled then
+            local coins = findCoins()
+            if #coins >= 2 and not coinEventActive then
+                coinEventDuration = 90
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Detected " .. #coins .. " coins!", Duration = 3, Image = 4483362458 })
+                startCoinCollect()
+            elseif coinEventActive and not coinCollectThread then
+                startCoinCollect()
+            end
+        end
+    end
+end)
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Collect Coins",
+    CurrentValue = false,
+    Flag         = "AutoCoin",
+    Callback     = function(Value)
+        autoCoinEnabled = Value
+        if Value then
+            hideLava()
+            local coins = findCoins()
+            if #coins >= 1 then
+                coinEventDuration = 90
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Coins found — farming!", Duration = 3, Image = 4483362458 })
+                startCoinCollect()
+            else
+                Rayfield:Notify({ Title = "Auto Coin", Content = "Ready — waiting for Coin Rain...", Duration = 3, Image = 4483362458 })
+            end
+        else
+            if coinCollectThread then task.cancel(coinCollectThread) coinCollectThread = nil end
+            coinEventActive = false
+        end
+    end,
+})
+
+HopTab:CreateSection("Auto Hop Coin Event")
+
+HopTab:CreateParagraph({
+    Title   = "How it works",
+    Content = "Hops servers looking for an active Coin Rain event, farms all coins, then hops again automatically.\n\nTo stop: RightShift (PC) or the Stop button below.",
+})
+
+local function showStopHopGui()
+    pcall(function()
+        local old = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+        if old then old:Destroy() end
+    end)
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name           = "OxyoStopHopGui"
+    screenGui.ResetOnSpawn   = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent         = game:GetService("CoreGui")
+
+    local btn = Instance.new("TextButton")
+    btn.Size             = UDim2.new(0, 170, 0, 55)
+    btn.Position         = UDim2.new(0.5, -85, 1, -80)
+    btn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    btn.TextColor3       = Color3.fromRGB(255, 255, 255)
+    btn.Text             = "⛔ Stop Auto Hop"
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 15
+    btn.Parent           = screenGui
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+    btn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        nuclearStop()
+    end)
+end
+
+local hopToggleRef = HopTab:CreateToggle({
+    Name         = "Auto Hop + Farm Coins",
+    CurrentValue = false,
+    Flag         = "AutoHopCoin",
+    Callback     = function(Value)
+        if not Value then
+            getgenv().OxyoAutoHopCoin = false
+            getgenv().OxyoHopStopped  = true
+            autoHopCoinEnabled = false
+            autoCoinEnabled    = false
+            if coinCollectThread then
+                pcall(task.cancel, coinCollectThread)
+                coinCollectThread = nil
+            end
+            pcall(function()
+                local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+                if g then g:Destroy() end
+            end)
+            Rayfield:Notify({ Title = "⛔ Auto Hop", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+            return
+        end
+
+        getgenv().OxyoHopStopped  = false
+        getgenv().OxyoAutoHopCoin = true
+        autoHopCoinEnabled = true
+        autoCoinEnabled    = true
+        hideLava()
+        showStopHopGui()
+
+        task.spawn(function()
+            Rayfield:Notify({ Title = "Auto Hop", Content = "Checking this server...", Duration = 2, Image = 4483362458 })
+            local status, timeLeft = waitForCoinRainStatus(10)
+            if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+
+            if status == "active" and (timeLeft or 0) >= 10 then
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
+                coinEventActive   = true
+                coinEventDuration = timeLeft or 60
+                startCoinCollect()
+            elseif status == "queued" then
+                Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
+                task.spawn(function()
+                    task.wait(timeLeft + 2)
+                    if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+                    if autoHopCoinEnabled and not coinEventActive then
+                        coinEventActive   = true
+                        coinEventDuration = 60
+                        startCoinCollect()
+                    end
+                end)
+            else
+                Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
+                task.wait(1)
+                if not getgenv().OxyoAutoHopCoin then return end
+                task.spawn(smartHop)
+            end
+        end)
+    end,
+})
+
+local function setHopToggleOff()
+    pcall(function()
+        if hopToggleRef and hopToggleRef.Set then hopToggleRef:Set(false) end
+    end)
+end
+
+local hopGodlyToggleRef
+local hopCelToggleRef
+
+nuclearStop = function()
+    getgenv().OxyoAutoHopCoin    = false
+    getgenv().OxyoHopStopped     = true
+    getgenv().OxyoAutoHopGodly   = false
+    getgenv().OxyoHopGodlyStopped = true
+    getgenv().OxyoAutoHopCel     = false
+    getgenv().OxyoHopCelStopped  = true
+    autoHopCoinEnabled  = false
+    autoCoinEnabled     = false
+    autoHopGodlyEnabled = false
+    autoHopCelEnabled   = false
+    if coinCollectThread then
+        pcall(task.cancel, coinCollectThread)
+        coinCollectThread = nil
+    end
+    if autoHopGodlyThread then
+        pcall(task.cancel, autoHopGodlyThread)
+        autoHopGodlyThread = nil
+    end
+    if autoHopCelThread then
+        pcall(task.cancel, autoHopCelThread)
+        autoHopCelThread = nil
+    end
+    setHopToggleOff()
+    pcall(function()
+        if hopGodlyToggleRef and hopGodlyToggleRef.Set then hopGodlyToggleRef:Set(false) end
+    end)
+    pcall(function()
+        if hopCelToggleRef and hopCelToggleRef.Set then hopCelToggleRef:Set(false) end
+    end)
+    pcall(function()
+        local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+        if g then g:Destroy() end
+    end)
+    Rayfield:Notify({ Title = "⛔ Auto Hop", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+end
+
+HopTab:CreateButton({
+    Name     = "⛔ Stop Auto Hop",
+    Callback = function() nuclearStop() end,
+})
+
+HopTab:CreateSection("Auto Hop + Godly")
+
+hopGodlyToggleRef = HopTab:CreateToggle({
+    Name         = "Auto Hop + Farm Godly",
+    CurrentValue = false,
+    Flag         = "AutoHopGodly",
+    Callback     = function(Value)
+        if not Value then
+            getgenv().OxyoAutoHopGodly    = false
+            getgenv().OxyoHopGodlyStopped = true
+            autoHopGodlyEnabled = false
+            if autoHopGodlyThread then
+                pcall(task.cancel, autoHopGodlyThread)
+                autoHopGodlyThread = nil
+            end
+            pcall(function()
+                local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+                if g then g:Destroy() end
+            end)
+            Rayfield:Notify({ Title = "⛔ Auto Hop Godly", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+            return
+        end
+
+        getgenv().OxyoHopGodlyStopped = false
+        getgenv().OxyoAutoHopGodly    = true
+        autoHopGodlyEnabled = true
+        hideLava()
+        showStopHopGui()
+
+        autoHopGodlyThread = task.spawn(function()
+            runRarityHopFarm("Godly", "OxyoAutoHopGodly", "OxyoHopGodlyStopped")
+        end)
+    end,
+})
+
+HopTab:CreateSection("Auto Hop + Celestial")
+
+hopCelToggleRef = HopTab:CreateToggle({
+    Name         = "Auto Hop + Farm Celestial",
+    CurrentValue = false,
+    Flag         = "AutoHopCelestial",
+    Callback     = function(Value)
+        if not Value then
+            getgenv().OxyoAutoHopCel    = false
+            getgenv().OxyoHopCelStopped = true
+            autoHopCelEnabled = false
+            if autoHopCelThread then
+                pcall(task.cancel, autoHopCelThread)
+                autoHopCelThread = nil
+            end
+            pcall(function()
+                local g = game:GetService("CoreGui"):FindFirstChild("OxyoStopHopGui")
+                if g then g:Destroy() end
+            end)
+            Rayfield:Notify({ Title = "⛔ Auto Hop Celestial", Content = "Stopped.", Duration = 3, Image = 4483362458 })
+            return
+        end
+
+        getgenv().OxyoHopCelStopped = false
+        getgenv().OxyoAutoHopCel    = true
+        autoHopCelEnabled = true
+        hideLava()
+        showStopHopGui()
+
+        autoHopCelThread = task.spawn(function()
+            runRarityHopFarm("Celestial", "OxyoAutoHopCel", "OxyoHopCelStopped")
+        end)
+    end,
+})
+
+CollectorTab:CreateSection("Auto Upgrade")
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Upgrade",
+    CurrentValue = false,
+    Flag         = "AutoUpgrade",
+    Callback     = function(Value)
+        auto.upgradeEnabled = Value
+        if Value then
+            auto.upgradeThread = task.spawn(function()
+                local upgradeRemote = nil
+                pcall(function() upgradeRemote = ReplicatedStorage.Events.Upgrade end)
+                while auto.upgradeEnabled do
+                    pcall(function()
+                        local gf = workspace:FindFirstChild("GameFolder")
+                        local plots = gf and gf:FindFirstChild("Plots")
+                        if not plots then return end
+                        for _, plot in pairs(plots:GetChildren()) do
+                            local brainrots = plot:FindFirstChild("Brainrots")
+                            if not brainrots then continue end
+                            for _, br in pairs(brainrots:GetChildren()) do
+                                local ok, owner = pcall(function() return br:GetAttribute("Owner") end)
+                                if ok and owner and tostring(owner) == tostring(player.UserId) then
+                                    for _, b in pairs(brainrots:GetChildren()) do
+                                        local slot = tonumber(b.Name)
+                                        if slot then
+                                            pcall(function() upgradeRemote:InvokeServer(slot) end)
+                                            task.wait(0.05)
+                                        end
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.2)
+                end
+            end)
+        else
+            if auto.upgradeThread then task.cancel(auto.upgradeThread) auto.upgradeThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateSection("Auto Sell")
+
+CollectorTab:CreateSlider({
+    Name         = "Sell Threshold",
+    Range        = {5, 50},
+    Increment    = 5,
+    Suffix       = "Brainrots",
+    CurrentValue = 50,
+    Flag         = "SellThreshold",
+    Callback     = function(Value) auto.sellThreshold = Value end,
+})
+
+CollectorTab:CreateSlider({
+    Name         = "Sell Every X Seconds  (0 = off)",
+    Range        = {0, 300},
+    Increment    = 10,
+    Suffix       = "sec",
+    CurrentValue = 0,
+    Flag         = "SellTimerInterval",
+    Callback     = function(Value) auto.sellTimer = Value end,
+})
+
+CollectorTab:CreateToggle({
+    Name         = "Auto Sell",
+    CurrentValue = false,
+    Flag         = "AutoSell",
+    Callback     = function(Value)
+        auto.sellEnabled = Value
+        if Value then
+            auto.sellThread = task.spawn(function()
+                local lastTimerSell = tick()
+                while auto.sellEnabled do
+
+                    local realCount     = getPlotBrainrotCount()
+                    local elapsed       = tick() - lastTimerSell
+                    local shouldByCount = realCount >= auto.sellThreshold
+                    local shouldByTimer = auto.sellTimer > 0 and elapsed >= auto.sellTimer and realCount > 0
+                    if shouldByCount or shouldByTimer then
+                        if doSell() then
+                            lastTimerSell = tick()
+                            Rayfield:Notify({
+                                Title    = "Auto Sell",
+                                Content  = "Sold " .. realCount .. " Brainrots!",
+                                Duration = 2,
+                                Image    = 4483362458,
+                            })
+                        end
+                        task.wait(2)
+                    else
+                        task.wait(0.5)
+                    end
+                end
+            end)
+        else
+            if auto.sellThread then task.cancel(auto.sellThread) auto.sellThread = nil end
+        end
+    end,
+})
+
+CollectorTab:CreateButton({
+    Name     = "Sell Now (Manual)",
+    Callback = function()
+        if doSell() then
+            Rayfield:Notify({ Title = "Sold!", Content = "All Brainrots sold successfully!", Duration = 3, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Error", Content = "Failed to sell — make sure the game is running.", Duration = 4, Image = 4483362458 })
+        end
+    end,
+})
+
+local statusParagraph = BrainrotStatusTab:CreateParagraph({
+    Title   = "Brainrots in World",
+    Content = "Scanning...",
+})
+
+BrainrotStatusTab:CreateSection("Live Brainrot Status")
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        pcall(function()
+            local snapshot = monitorData.brainrots
+            if #snapshot == 0 then
+                pcall(function()
+                    statusParagraph:Set({ Title = "Brainrots in World (0)", Content = "No Brainrots in world right now." })
+                end)
+                return
+            end
+            local lines = {}
+            for _, entry in ipairs(snapshot) do
+                if entry.obj and entry.obj.Parent then
+                    local traitStr = ""
+                    local td = traitData[entry.obj]
+                    if td and #td.traitNames > 0 then
+                        traitStr = " [TRAIT: " .. table.concat(td.traitNames, "+") .. "]"
+                    end
+                    table.insert(lines, "[" .. (entry.rarity or "?") .. "] " .. (entry.name or "?") .. " — " .. (entry.mutation or "Normal") .. traitStr)
+                end
+            end
+            pcall(function()
+                statusParagraph:Set({
+                    Title   = "Brainrots in World (" .. #lines .. ")",
+                    Content = #lines > 0 and table.concat(lines, "\n") or "Nothing right now.",
+                })
+            end)
+        end)
+    end
+end)
+
+BrainrotStatusTab:CreateSection("Mutation Alert")
+
+BrainrotStatusTab:CreateDropdown({
+    Name            = "Alert for Mutations",
+    Options         = ALERT_MUTATIONS,
+    CurrentOption   = {},
+    MultipleOptions = true,
+    Flag            = "MutationAlertDropdown",
+    Callback        = function(Options) mutationAlertDropdown = Options end,
+})
+
+BrainrotStatusTab:CreateToggle({
+    Name         = "Mutation Alert",
+    CurrentValue = false,
+    Flag         = "MutationAlert",
+    Callback     = function(Value)
+        auto.alertEnabled = Value
+        if Value then
+            local lastSeen = {}
+            auto.alertThread = task.spawn(function()
+                while auto.alertEnabled do
+                    pcall(function()
+                        for _, e in ipairs(monitorData.mutations) do
+                            if e.obj and e.obj.Parent then
+                                local alertSet = {}
+                                for _, m in ipairs(mutationAlertDropdown) do alertSet[m] = true end
+                                local shouldAlert = (#mutationAlertDropdown == 0) or alertSet[e.mutation]
+                                local key = e.name .. "_" .. e.mutation .. "_" .. e.rarity
+                                if shouldAlert and not lastSeen[key] then
+                                    lastSeen[key] = true
+                                    Rayfield:Notify({
+                                        Title    = "Mutation Detected!",
+                                        Content  = "[" .. e.mutation .. "] " .. e.name .. "\nZone: " .. e.rarity,
+                                        Duration = 6,
+                                        Image    = 4483362458,
+                                    })
+                                end
+                            end
+                        end
+                        local alive = {}
+                        for _, e in ipairs(monitorData.mutations) do
+                            alive[e.name .. "_" .. e.mutation .. "_" .. e.rarity] = true
+                        end
+                        for k in pairs(lastSeen) do
+                            if not alive[k] then lastSeen[k] = nil end
+                        end
+                    end)
+                    task.wait(0.5)
+                end
+            end)
+        else
+            if auto.alertThread then task.cancel(auto.alertThread) auto.alertThread = nil end
+        end
+    end,
+})
+
+LuckyStatusTab:CreateSection("Live Status")
+
+local luckyStatusPara = LuckyStatusTab:CreateParagraph({
+    Title   = "Lucky Block Status",
+    Content = "Scanning...",
+})
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function()
+            local blocks       = getLuckyBlocks()
+            local activeLines  = {}
+            local pendingLines = {}
+            for _, b in ipairs(blocks) do
+                local bname = tostring(b.name or "?")
+                if b.active then
+                    table.insert(activeLines, "✅ " .. bname .. "  (" .. math.floor(b.pos.X) .. ", " .. math.floor(b.pos.Y) .. ", " .. math.floor(b.pos.Z) .. ")")
+                else
+                    table.insert(pendingLines, "⏳ " .. bname .. " — Respawning...")
+                end
+            end
+            local total   = #blocks
+            local active  = #activeLines
+            local content = "Active: " .. active .. " / " .. total .. "\n\n"
+                          .. table.concat(activeLines, "\n")
+                          .. (#pendingLines > 0 and ("\n\n" .. table.concat(pendingLines, "\n")) or "")
+            pcall(function()
+                luckyStatusPara:Set({ Title = "Lucky Block Status (" .. active .. "/" .. total .. ")", Content = content })
+            end)
+        end)
+    end
+end)
+
+GearTab:CreateSection("Speed Upgrade")
+
+GearTab:CreateButton({
+    Name     = "+1 Speed",
+    Callback = function()
+        local ok, result = pcall(function() return ReplicatedStorage.Events.Speed:InvokeServer("Speed", 1) end)
+        if not ok or (type(result) == "string" and result:lower():find("enough")) then
+            Rayfield:Notify({ Title = "Not Enough Cash", Content = "You don't have enough cash for +1 Speed.", Duration = 4, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Upgraded!", Content = "+1 Speed purchased!", Duration = 3, Image = 4483362458 })
+        end
+    end,
+})
+
+GearTab:CreateButton({
+    Name     = "+5 Speed",
+    Callback = function()
+        local ok, result = pcall(function() return ReplicatedStorage.Events.Speed:InvokeServer("Speed", 5) end)
+        if not ok or (type(result) == "string" and result:lower():find("enough")) then
+            Rayfield:Notify({ Title = "Not Enough Cash", Content = "You don't have enough cash for +5 Speed.", Duration = 4, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Upgraded!", Content = "+5 Speed purchased!", Duration = 3, Image = 4483362458 })
+        end
+    end,
+})
+
+GearTab:CreateButton({
+    Name     = "+10 Speed",
+    Callback = function()
+        local ok, result = pcall(function() return ReplicatedStorage.Events.Speed:InvokeServer("Speed", 10) end)
+        if not ok or (type(result) == "string" and result:lower():find("enough")) then
+            Rayfield:Notify({ Title = "Not Enough Cash", Content = "You don't have enough cash for +10 Speed.", Duration = 4, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Upgraded!", Content = "+10 Speed purchased!", Duration = 3, Image = 4483362458 })
+        end
+    end,
+})
+
+GearTab:CreateSection("Carry Upgrade")
+
+GearTab:CreateButton({
+    Name     = "+1 Carry",
+    Callback = function()
+        local ok, result = pcall(function() return ReplicatedStorage.Events.Carry:InvokeServer("Carry") end)
+        if not ok or (type(result) == "string" and result:lower():find("enough")) then
+            Rayfield:Notify({ Title = "Not Enough Cash", Content = "You don't have enough cash for +1 Carry.", Duration = 4, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Upgraded!", Content = "+1 Carry purchased!", Duration = 3, Image = 4483362458 })
+        end
+    end,
+})
+
+GearTab:CreateSection("Buy Gear")
+
+local gearOptions = {}
+for _, data in pairs(GEAR_REGISTRY) do
+    table.insert(gearOptions, data.displayName .. "  [" .. data.coinPrice .. " coins]")
+end
+table.sort(gearOptions)
+
+local function resolveGearKey(opt)
+    for key, data in pairs(GEAR_REGISTRY) do
+        if opt and opt:find(data.displayName, 1, true) then return key end
+    end
+    return nil
+end
+
+GearTab:CreateDropdown({
+    Name          = "Select Gear",
+    Options       = gearOptions,
+    CurrentOption = {},
+    Flag          = "GearDropdown",
+    Callback      = function(Option)
+        local opt = type(Option) == "table" and Option[1] or Option
+        selectedGear = resolveGearKey(opt)
+    end,
+})
+
+GearTab:CreateButton({
+    Name     = "Buy Selected Gear",
+    Callback = function()
+        if not selectedGear then
+            Rayfield:Notify({ Title = "Gear Shop", Content = "Select a gear from the list first!", Duration = 3, Image = 4483362458 })
+            return
+        end
+        task.spawn(function()
+            local data   = GEAR_REGISTRY[selectedGear]
+            local result = buyGear(selectedGear)
+            if result == BUY_RESULT.SUCCESS then
+                Rayfield:Notify({ Title = "✅ Purchased!", Content = data.displayName .. " bought!", Duration = 4, Image = 4483362458 })
+            elseif result == BUY_RESULT.OUT_OF_STOCK then
+                Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is currently out of stock.", Duration = 4, Image = 4483362458 })
+            elseif result == BUY_RESULT.NO_COINS then
+                Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins for " .. data.displayName, Duration = 4, Image = 4483362458 })
+            elseif result == BUY_RESULT.NOT_IN_SHOP then
+                Rayfield:Notify({ Title = "Not in Shop", Content = data.displayName .. " is not available right now.", Duration = 4, Image = 4483362458 })
+            end
+        end)
+    end,
+})
+
+GearTab:CreateSection("Auto Buy")
+
+GearTab:CreateParagraph({
+    Title   = "Auto Buy — How it works",
+    Content = "✅ Purchased = stops automatically\n⏳ Out of Stock = notifies and stops\n💰 Not enough coins = retries every 30s\n🚫 Not in shop = watches and buys the moment it appears",
+})
+
+GearTab:CreateToggle({
+    Name         = "Auto Buy",
+    CurrentValue = false,
+    Flag         = "AutoBuyGear",
+    Callback     = function(Value)
+        auto.buyEnabled = Value
+        if Value then
+            if not selectedGear then
+                Rayfield:Notify({ Title = "Auto Buy", Content = "Select a gear first!", Duration = 3, Image = 4483362458 })
+                auto.buyEnabled = false
+                return
+            end
+            local data = GEAR_REGISTRY[selectedGear]
+            Rayfield:Notify({ Title = "Auto Buy", Content = "Watching for: " .. data.displayName, Duration = 3, Image = 4483362458 })
+
+            auto.buyThread = task.spawn(function()
+
+                local function isGearInShop()
+                    local gf = workspace:FindFirstChild("GameFolder")
+                    local ga = gf and gf:FindFirstChild("Shops")
+                             and gf.Shops:FindFirstChild("Vendor")
+                             and gf.Shops.Vendor:FindFirstChild("GearsAccess")
+                    return ga ~= nil and #ga:GetChildren() > 0
+                end
+
+                local result = buyGear(selectedGear)
+
+                if result == BUY_RESULT.SUCCESS then
+                    auto.buyEnabled = false
+                    return
+
+                elseif result == BUY_RESULT.OUT_OF_STOCK then
+
+                    Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is out of stock — Auto Buy stopped.", Duration = 5, Image = 4483362458 })
+                    auto.buyEnabled = false
+                    return
+
+                elseif result == BUY_RESULT.NO_COINS then
+
+                    Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins — retrying every 30s.", Duration = 4, Image = 4483362458 })
+                    while auto.buyEnabled do
+                        task.wait(30)
+                        if not auto.buyEnabled then break end
+                        local r = buyGear(selectedGear)
+                        if r == BUY_RESULT.SUCCESS then
+                            auto.buyEnabled = false
+                            return
+                        elseif r == BUY_RESULT.OUT_OF_STOCK then
+                            Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is out of stock — Auto Buy stopped.", Duration = 5, Image = 4483362458 })
+                            auto.buyEnabled = false
+                            return
+                        elseif r == BUY_RESULT.NO_COINS then
+                            Rayfield:Notify({ Title = "Still Not Enough Coins", Content = "Need " .. data.coinPrice .. " — retrying in 30s.", Duration = 3, Image = 4483362458 })
+                        end
+                    end
+
+                elseif result == BUY_RESULT.NOT_IN_SHOP then
+
+                    Rayfield:Notify({ Title = "Not in Shop", Content = "Watching for " .. data.displayName .. " to appear...", Duration = 4, Image = 4483362458 })
+
+                    while auto.buyEnabled do
+                        task.wait(1)
+                        if not auto.buyEnabled then break end
+                        if isGearInShop() then
+
+                            task.wait(0.2)
+                            local r = buyGear(selectedGear)
+                            if r == BUY_RESULT.SUCCESS then
+                                auto.buyEnabled = false
+                                return
+                            elseif r == BUY_RESULT.OUT_OF_STOCK then
+                                Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is out of stock — Auto Buy stopped.", Duration = 5, Image = 4483362458 })
+                                auto.buyEnabled = false
+                                return
+                            elseif r == BUY_RESULT.NO_COINS then
+                                Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins — retrying every 30s.", Duration = 4, Image = 4483362458 })
+
+                                while auto.buyEnabled do
+                                    task.wait(30)
+                                    local r2 = buyGear(selectedGear)
+                                    if r2 == BUY_RESULT.SUCCESS then auto.buyEnabled = false return end
+                                    if r2 == BUY_RESULT.OUT_OF_STOCK then
+                                        Rayfield:Notify({ Title = "Out of Stock", Content = data.displayName .. " is out of stock — stopped.", Duration = 5, Image = 4483362458 })
+                                        auto.buyEnabled = false
+                                        return
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            if auto.buyThread then task.cancel(auto.buyThread) auto.buyThread = nil end
+            Rayfield:Notify({ Title = "Auto Buy", Content = "Stopped.", Duration = 2, Image = 4483362458 })
+        end
+    end,
+})
+
+CheeseTab:CreateSection("Auto Cheese")
+
+local function runAutoCheeseLoop()
+    while auto.cheeseEnabled do
+        if auto.cheeseBusy or _G.cheeseEventBusy then task.wait(0.1) continue end
+        local gf = workspace:FindFirstChild("GameFolder")
+        local cheeseFolder = gf and gf:FindFirstChild("CheeseFolder")
+        if not cheeseFolder then task.wait(2) continue end
+        local cheeses = cheeseFolder:GetChildren()
+        if #cheeses == 0 then task.wait(1.5) continue end
+        for _, cheeseModel in ipairs(cheeses) do
+            if not auto.cheeseEnabled then break end
+            if auto.cheeseBusy or _G.cheeseEventBusy then task.wait(0.1) break end
+            if not cheeseModel or not cheeseModel.Parent then continue end
+            local mainPart = cheeseModel:FindFirstChild("Main")
+            if not mainPart or not mainPart:IsA("BasePart") then continue end
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not root then task.wait(1) break end
+            safeTeleport(CFrame.new(mainPart.Position + Vector3.new(0, 2, 0)))
+            task.wait(0.35)
+        end
+        task.wait(0.5)
+    end
+end
+
+CheeseTab:CreateToggle({
+    Name         = "Auto Collect Cheese",
+    CurrentValue = false,
+    Flag         = "AutoCheese",
+    Callback     = function(Value)
+        auto.cheeseEnabled = Value
+        if Value then
+            hideLava()
+            auto.cheeseThread = task.spawn(runAutoCheeseLoop)
+        else
+            if auto.cheeseThread then task.cancel(auto.cheeseThread) auto.cheeseThread = nil end
+        end
+    end,
+})
+
+CheeseTab:CreateSection("Auto Feed Steak")
+
+local function getCheeseSubmitPrompt()
+    local gf = workspace:FindFirstChild("GameFolder")
+    if not gf then return nil end
+    local ev = gf:FindFirstChild("CheeseEvent")
+    if not ev then return nil end
+    local plat = ev:FindFirstChild("Platform")
+    if not plat then return nil end
+    local att = plat:FindFirstChild("SubmitAttachment")
+    if att then
+        local p = att:FindFirstChildWhichIsA("ProximityPrompt")
+                  or att:FindFirstChild("Prompt")
+        if p then return p end
+    end
+    return plat:FindFirstChildWhichIsA("ProximityPrompt", true)
+end
+
+local function getCheeseEventPos()
+    local gf = workspace:FindFirstChild("GameFolder")
+    if not gf then return nil end
+    local ev = gf:FindFirstChild("CheeseEvent")
+    if not ev then return nil end
+    local plat = ev:FindFirstChild("Platform")
+    if not plat then return nil end
+    local bp = plat:FindFirstChildWhichIsA("BasePart") or (plat:IsA("BasePart") and plat)
+    return bp and bp.Position
+end
+
+CheeseTab:CreateToggle({
+    Name         = "Auto Feed Steak",
+    CurrentValue = false,
+    Flag         = "AutoFeedSteak",
+    Callback     = function(Value)
+        auto.feedEnabled = Value
+        if Value then
+            auto.feedThread = task.spawn(function()
+                while auto.feedEnabled do
+                    if auto.cheeseEnabled then
+                        auto.cheeseBusy    = true
+                        _G.cheeseEventBusy = true
+                    end
+                    pcall(function()
+                        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        local pos  = getCheeseEventPos()
+                        if root and pos then
+                            root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+                        end
+                    end)
+                    task.wait(1.5)
+                    pcall(function()
+                        local prompt = getCheeseSubmitPrompt()
+                        if prompt then _fireprox(prompt) end
+                    end)
+                    if auto.cheeseEnabled then
+                        auto.cheeseBusy    = false
+                        _G.cheeseEventBusy = false
+                    end
+                    task.wait(auto.feedInterval)
+                end
+                auto.cheeseBusy    = false
+                _G.cheeseEventBusy = false
+            end)
+        else
+            if auto.feedThread then task.cancel(auto.feedThread) auto.feedThread = nil end
+            auto.cheeseBusy    = false
+            _G.cheeseEventBusy = false
+        end
+    end,
+})
+
+ZonesTab:CreateSection("Teleport to Zones")
+
+local zones = {
+    { name = "Common Zone",    pos = Vector3.new(-5.604886,   6.981283,    -181.638321) },
+    { name = "Rare Zone",      pos = Vector3.new(3.469897,    21.468637,   -381.855286) },
+    { name = "Epic Zone",      pos = Vector3.new(1.057454,    19.648050,   -653.962280) },
+    { name = "Legendary Zone", pos = Vector3.new(34.306286,   29.472792,   -933.720398) },
+    { name = "Mythic Zone",    pos = Vector3.new(-4.003283,   41.508194,  -1372.488647) },
+    { name = "Secret Zone",    pos = Vector3.new(-41.617702,  77.059113,  -1857.829224) },
+    { name = "Celestial Zone", pos = Vector3.new(-44.376785, 170.028870,  -2253.302979) },
+    { name = "End Zone",       pos = Vector3.new(-16.794611, 444.921265,  -3505.147217) },
+    { name = "Fuse Zone",      pos = Vector3.new(-4.381921,  511.245667,  -3622.835449) },
+}
+
+for _, zone in ipairs(zones) do
+    ZonesTab:CreateButton({
+        Name     = zone.name,
+        Callback = function()
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then root.CFrame = CFrame.new(zone.pos) end
+        end,
+    })
+end
+
+HitboxTab:CreateSection("Hitbox Settings")
+
+HitboxTab:CreateToggle({
+    Name         = "Hitbox On/Off",
+    CurrentValue = false,
+    Flag         = "HitboxToggle",
+    Callback     = function(Value)
+        hitboxEnabled = Value
+        if not Value then
+            for _, v in next, Players:GetPlayers() do
+                if v ~= player then
+                    pcall(function()
+                        local root = v.Character and v.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            root.Size         = Vector3.new(2, 2, 1)
+                            root.Transparency = 1
+                            root.CanCollide   = false
+                        end
+                    end)
+                end
+            end
+        end
+    end,
+})
+
+HitboxTab:CreateSlider({
+    Name         = "Hitbox Size",
+    Range        = {5, 150},
+    Increment    = 5,
+    Suffix       = "Studs",
+    CurrentValue = 50,
+    Flag         = "HitboxSize",
+    Callback     = function(Value) hitboxSize = Value end,
+})
+
+HitboxTab:CreateSlider({
+    Name         = "Hitbox Transparency",
+    Range        = {0, 10},
+    Increment    = 1,
+    Suffix       = "/10",
+    CurrentValue = 7,
+    Flag         = "HitboxTransp",
+    Callback     = function(Value) hitboxTransp = Value / 10 end,
+})
+
+HitboxTab:CreateDropdown({
+    Name          = "Hitbox Color",
+    Options       = {"Really blue","Bright red","Lime green","Hot pink","Cyan","Really black","White"},
+    CurrentOption = {"Really blue"},
+    Flag          = "HitboxColor",
+    Callback      = function(Option) hitboxColor = BrickColor.new(type(Option)=="table" and Option[1] or Option) end,
+})
+
+ExtraTab:CreateSection("Visual Enhancements")
+
+ExtraTab:CreateToggle({
+    Name         = "FullBright",
+    CurrentValue = false,
+    Flag         = "FullBright",
+    Callback     = function(Value)
+        fullBrightEnabled = Value
+        if Value then
+            Lighting.Brightness     = 2
+            Lighting.ClockTime      = 14
+            Lighting.FogEnd         = 100000
+            Lighting.GlobalShadows  = false
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        else
+            Lighting.Brightness     = origLight[1]
+            Lighting.ClockTime      = origLight[2]
+            Lighting.FogEnd         = origLight[3]
+            Lighting.GlobalShadows  = origLight[4]
+            Lighting.OutdoorAmbient = origLight[5]
+        end
+    end,
+})
+
+ExtraTab:CreateButton({
+    Name     = "Remove Fog",
+    Callback = function()
+        Lighting.FogEnd   = 100000
+        Lighting.FogStart = 0
+    end,
+})
+
+ExtraTab:CreateToggle({
+    Name         = "Infinite Zoom",
+    CurrentValue = false,
+    Flag         = "InfiniteZoom",
+    Callback     = function(Value)
+        infiniteZoomEnabled = Value
+        if Value then
+            player.CameraMaxZoomDistance = 99999
+            player.CameraMinZoomDistance = 0
+        else
+            player.CameraMaxZoomDistance = 128
+            player.CameraMinZoomDistance = 0.5
+        end
+    end,
+})
+
+ExtraTab:CreateSection("ESP Features")
+
+local function createESP(target)
+    if not target or not target:FindFirstChild("HumanoidRootPart") then return end
+    if target:FindFirstChild("PlayerESP") then return end
+    local h = Instance.new("Highlight")
+    h.Parent              = target
+    h.FillColor           = Color3.fromRGB(255, 0, 0)
+    h.OutlineColor        = Color3.fromRGB(255, 255, 255)
+    h.FillTransparency    = 0.5
+    h.OutlineTransparency = 0
+    h.Name                = "PlayerESP"
+end
+
+local function removeESP(target)
+    if target then
+        local esp = target:FindFirstChild("PlayerESP")
+        if esp then esp:Destroy() end
+    end
+end
+
+ExtraTab:CreateToggle({
+    Name         = "Player ESP",
+    CurrentValue = false,
+    Flag         = "PlayerESP",
+    Callback     = function(Value)
+        playerESPEnabled = Value
+        if Value then
+            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character then
+                    createESP(otherPlayer.Character)
+                end
+            end
+            espConnections.PlayerAdded = Players.PlayerAdded:Connect(function(newPlayer)
+                if playerESPEnabled then
+                    newPlayer.CharacterAdded:Connect(function(char)
+                        if playerESPEnabled then task.wait(0.5) createESP(char) end
+                    end)
+                end
+            end)
+            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                if otherPlayer ~= player then
+                    espConnections[otherPlayer.UserId] = otherPlayer.CharacterAdded:Connect(function(char)
+                        if playerESPEnabled then task.wait(0.5) createESP(char) end
+                    end)
+                end
+            end
+        else
+            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                if otherPlayer.Character then removeESP(otherPlayer.Character) end
+            end
+            for _, conn in pairs(espConnections) do
+                if conn then conn:Disconnect() end
+            end
+            espConnections = {}
+        end
+    end,
+})
+
+ExtraTab:CreateToggle({
+    Name         = "Celestial ESP",
+    CurrentValue = false,
+    Flag         = "CelestialESP",
+    Callback     = function(Value)
+        celestialESPEnabled = Value
+        if Value then
+            local function addCelestialESP()
+                pcall(function()
+                    local gf = workspace:FindFirstChild("GameFolder")
+                    if not gf then return end
+                    local br = gf:FindFirstChild("Brainrots")
+                    if not br then return end
+                    local cf = br:FindFirstChild("Celestial")
+                    if not cf then return end
+                    for _, obj in pairs(cf:GetChildren()) do
+                        if obj:IsA("Model") and not obj:FindFirstChild("CelestialESP") then
+                            local h = Instance.new("Highlight")
+                            h.Parent              = obj
+                            h.FillColor           = Color3.fromRGB(255, 255, 0)
+                            h.OutlineColor        = Color3.fromRGB(255, 255, 255)
+                            h.FillTransparency    = 0.3
+                            h.OutlineTransparency = 0
+                            h.Name                = "CelestialESP"
+                        end
+                    end
+                end)
+            end
+            addCelestialESP()
+            celestialESPConnection = task.spawn(function()
+                while celestialESPEnabled do
+                    task.wait(1)
+                    addCelestialESP()
+                end
+            end)
+        else
+            if celestialESPConnection then
+                celestialESPEnabled = false
+                celestialESPConnection = nil
+            end
+            pcall(function()
+                local gf = workspace:FindFirstChild("GameFolder")
+                if not gf then return end
+                local br = gf:FindFirstChild("Brainrots")
+                if not br then return end
+                local cf = br:FindFirstChild("Celestial")
+                if not cf then return end
+                for _, obj in pairs(cf:GetDescendants()) do
+                    if obj.Name == "CelestialESP" then obj:Destroy() end
+                end
+            end)
+        end
+    end,
+})
+
+do
+local RARITY_COLORS = {
+    Common    = Color3.fromRGB(180, 180, 180),
+    Uncommon  = Color3.fromRGB(100, 220, 100),
+    Rare      = Color3.fromRGB(80,  140, 255),
+    Epic      = Color3.fromRGB(180, 80,  255),
+    Legendary = Color3.fromRGB(255, 180, 0),
+    Mythic    = Color3.fromRGB(255, 80,  80),
+    Secret    = Color3.fromRGB(80,  220, 220),
+    Celestial = Color3.fromRGB(255, 220, 100),
+    Godly     = Color3.fromRGB(255, 120, 30),
+}
+local MUTATION_COLORS = {
+    Gold      = Color3.fromRGB(255, 215, 0),
+    Emerald   = Color3.fromRGB(80,  200, 120),
+    Diamond   = Color3.fromRGB(150, 220, 255),
+    Cheese    = Color3.fromRGB(255, 200, 50),
+    Bloodmoon = Color3.fromRGB(200, 40,  40),
+    Rainbow   = Color3.fromRGB(255, 100, 200),
+    Normal    = Color3.fromRGB(120, 120, 140),
+}
+
+local listGui = Instance.new("ScreenGui")
+listGui.Name           = "OxyoBrainrotList"
+listGui.ResetOnSpawn   = false
+listGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+listGui.DisplayOrder   = 999
+listGui.IgnoreGuiInset = true
+pcall(function() listGui.Parent = game:GetService("CoreGui") end)
+if not listGui.Parent then listGui.Parent = player.PlayerGui end
+
+local panel = Instance.new("Frame")
+panel.Name             = "Panel"
+panel.Size             = UDim2.new(0, 320, 0, 400)
+panel.Position         = UDim2.new(0.5, -160, 0.5, -200)
+panel.BackgroundColor3 = Color3.fromRGB(13, 13, 20)
+panel.BorderSizePixel  = 0
+panel.Visible          = false
+panel.ClipsDescendants = true
+panel.Parent           = listGui
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
+local ps = Instance.new("UIStroke", panel)
+ps.Color     = Color3.fromRGB(55, 55, 75)
+ps.Thickness = 1
+
+local titleBar = Instance.new("Frame", panel)
+titleBar.Name             = "TitleBar"
+titleBar.Size             = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+titleBar.BorderSizePixel  = 0
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
+local tbFix = Instance.new("Frame", titleBar)
+tbFix.Size             = UDim2.new(1, 0, 0, 10)
+tbFix.Position         = UDim2.new(0, 0, 1, -10)
+tbFix.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+tbFix.BorderSizePixel  = 0
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size                  = UDim2.new(1, -50, 1, 0)
+titleLabel.Position              = UDim2.new(0, 14, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3            = Color3.fromRGB(240, 240, 255)
+titleLabel.TextXAlignment        = Enum.TextXAlignment.Left
+titleLabel.Font                  = Enum.Font.GothamBold
+titleLabel.TextSize              = 14
+titleLabel.Text                  = "🧠  Brainrot List"
+
+local closeBtn = Instance.new("TextButton", titleBar)
+closeBtn.Size             = UDim2.new(0, 26, 0, 26)
+closeBtn.Position         = UDim2.new(1, -33, 0.5, -13)
+closeBtn.BackgroundColor3 = Color3.fromRGB(160, 35, 35)
+closeBtn.Text             = "✕"
+closeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+closeBtn.Font             = Enum.Font.GothamBold
+closeBtn.TextSize         = 12
+closeBtn.BorderSizePixel  = 0
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+local infoBar = Instance.new("Frame", panel)
+infoBar.Size             = UDim2.new(1, -16, 0, 32)
+infoBar.Position         = UDim2.new(0, 8, 0, 44)
+infoBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+infoBar.BorderSizePixel  = 0
+Instance.new("UICorner", infoBar).CornerRadius = UDim.new(0, 6)
+
+local rarityLabel = Instance.new("TextLabel", infoBar)
+rarityLabel.Size                  = UDim2.new(0.55, 0, 1, 0)
+rarityLabel.Position              = UDim2.new(0, 10, 0, 0)
+rarityLabel.BackgroundTransparency = 1
+rarityLabel.TextColor3            = Color3.fromRGB(170, 170, 210)
+rarityLabel.Font                  = Enum.Font.Gotham
+rarityLabel.TextSize              = 11
+rarityLabel.TextXAlignment        = Enum.TextXAlignment.Left
+rarityLabel.Text                  = "Viewing: All"
+
+local countLabel = Instance.new("TextLabel", infoBar)
+countLabel.Size                  = UDim2.new(0.45, -10, 1, 0)
+countLabel.Position              = UDim2.new(0.55, 0, 0, 0)
+countLabel.BackgroundTransparency = 1
+countLabel.TextColor3            = Color3.fromRGB(100, 210, 100)
+countLabel.Font                  = Enum.Font.GothamBold
+countLabel.TextSize              = 11
+countLabel.TextXAlignment        = Enum.TextXAlignment.Right
+countLabel.Text                  = "Count: 0"
+
+local searchBar = Instance.new("TextBox", panel)
+searchBar.Size                  = UDim2.new(1, -16, 0, 30)
+searchBar.Position              = UDim2.new(0, 8, 0, 82)
+searchBar.BackgroundColor3      = Color3.fromRGB(30, 30, 50)
+searchBar.BorderSizePixel       = 0
+searchBar.TextColor3            = Color3.fromRGB(230, 230, 255)
+searchBar.PlaceholderText       = "🔍  Search..."
+searchBar.PlaceholderColor3     = Color3.fromRGB(100, 100, 140)
+searchBar.Font                  = Enum.Font.Gotham
+searchBar.TextSize              = 12
+searchBar.TextXAlignment        = Enum.TextXAlignment.Left
+searchBar.ClearTextOnFocus      = false
+searchBar.Text                  = ""
+Instance.new("UICorner", searchBar).CornerRadius = UDim.new(0, 7)
+local sbs = Instance.new("UIStroke", searchBar)
+sbs.Color     = Color3.fromRGB(80, 80, 130)
+sbs.Thickness = 1.5
+local sbPad = Instance.new("UIPadding", searchBar)
+sbPad.PaddingLeft = UDim.new(0, 8)
+
+local scrollFrame = Instance.new("ScrollingFrame", panel)
+scrollFrame.Size                 = UDim2.new(1, -16, 1, -124)
+scrollFrame.Position             = UDim2.new(0, 8, 0, 118)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel      = 0
+scrollFrame.ScrollBarThickness   = 4
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 110)
+scrollFrame.CanvasSize           = UDim2.new(0, 0, 0, 0)
+scrollFrame.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+scrollFrame.ElasticBehavior      = Enum.ElasticBehavior.Always
+
+local listLayout = Instance.new("UIListLayout", scrollFrame)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding   = UDim.new(0, 5)
+local lp = Instance.new("UIPadding", scrollFrame)
+lp.PaddingLeft  = UDim.new(0, 1)
+lp.PaddingRight = UDim.new(0, 1)
+lp.PaddingTop   = UDim.new(0, 2)
+
+local listPanelVisible    = false
+local listEntries         = {}
+local listUpdateThread    = nil
+local currentRarityFilter = nil
+local currentSearchQuery  = ""
+
+searchBar:GetPropertyChangedSignal("Text"):Connect(function()
+    currentSearchQuery = searchBar.Text:lower()
+    pcall(refreshList)
+end)
+
+local function clearListEntries()
+    for _, f in pairs(listEntries) do pcall(function() f:Destroy() end) end
+    listEntries = {}
+end
+
+local function makeEntry(entry, order)
+    local td     = traitData[entry.obj]
+    local traits = (td and #td.traitNames > 0) and table.concat(td.traitNames, "+") or "—"
+    local mut    = entry.mutation or "Normal"
+    local rCol   = RARITY_COLORS[entry.rarity]  or Color3.fromRGB(200, 200, 200)
+    local mCol   = MUTATION_COLORS[mut]          or Color3.fromRGB(140, 140, 140)
+
+    local card = Instance.new("Frame", scrollFrame)
+    card.Size             = UDim2.new(1, -4, 0, 60)
+    card.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    card.BorderSizePixel  = 0
+    card.LayoutOrder      = order
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 7)
+    local cs = Instance.new("UIStroke", card)
+    cs.Color        = rCol
+    cs.Thickness    = 1
+    cs.Transparency = 0.55
+
+    local bar = Instance.new("Frame", card)
+    bar.Size             = UDim2.new(0, 4, 1, 0)
+    bar.BackgroundColor3 = rCol
+    bar.BorderSizePixel  = 0
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 4)
+
+    local nameL = Instance.new("TextLabel", card)
+    nameL.Size                  = UDim2.new(1, -100, 0, 20)
+    nameL.Position              = UDim2.new(0, 12, 0, 5)
+    nameL.BackgroundTransparency = 1
+    nameL.TextColor3            = Color3.fromRGB(240, 240, 255)
+    nameL.Font                  = Enum.Font.GothamBold
+    nameL.TextSize              = 12
+    nameL.TextXAlignment        = Enum.TextXAlignment.Left
+    nameL.TextTruncate          = Enum.TextTruncate.AtEnd
+    nameL.Text                  = tostring(entry.name or "?")
+
+    local rarL = Instance.new("TextLabel", card)
+    rarL.Size                  = UDim2.new(1, -100, 0, 14)
+    rarL.Position              = UDim2.new(0, 12, 0, 24)
+    rarL.BackgroundTransparency = 1
+    rarL.TextColor3            = rCol
+    rarL.Font                  = Enum.Font.Gotham
+    rarL.TextSize              = 10
+    rarL.TextXAlignment        = Enum.TextXAlignment.Left
+    rarL.Text                  = entry.rarity
+
+    local infoL = Instance.new("TextLabel", card)
+    infoL.Size                  = UDim2.new(1, -100, 0, 14)
+    infoL.Position              = UDim2.new(0, 12, 0, 39)
+    infoL.BackgroundTransparency = 1
+    infoL.TextColor3            = mCol
+    infoL.Font                  = Enum.Font.Gotham
+    infoL.TextSize              = 9
+    infoL.TextXAlignment        = Enum.TextXAlignment.Left
+    infoL.Text                  = "Mut: " .. mut .. "  ·  Trait: " .. traits
+
+    local tpBtn = Instance.new("TextButton", card)
+    tpBtn.Size             = UDim2.new(0, 68, 0, 26)
+    tpBtn.Position         = UDim2.new(1, -76, 0.5, -13)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(35, 75, 160)
+    tpBtn.Text             = "⟶ TP"
+    tpBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+    tpBtn.Font             = Enum.Font.GothamBold
+    tpBtn.TextSize         = 11
+    tpBtn.BorderSizePixel  = 0
+    Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+    tpBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            local obj = entry.obj
+            if not obj or not obj.Parent then
+                Rayfield:Notify({ Title = "Brainrot List", Content = "Brainrot no longer exists!", Duration = 3, Image = 4483362458 })
+                return
+            end
+            local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            if part then
+                safeTeleport(part.CFrame * CFrame.new(0, 4, 0))
+                Rayfield:Notify({ Title = "Teleported!", Content = entry.name, Duration = 2, Image = 4483362458 })
+            end
+        end)
+    end)
+    tpBtn.MouseEnter:Connect(function() tpBtn.BackgroundColor3 = Color3.fromRGB(55, 100, 200) end)
+    tpBtn.MouseLeave:Connect(function() tpBtn.BackgroundColor3 = Color3.fromRGB(35, 75, 160) end)
+
+    table.insert(listEntries, card)
+end
+
+local function refreshList()
+    clearListEntries()
+    local snapshot = monitorData.brainrots
+    local filtered = {}
+    for _, entry in ipairs(snapshot) do
+        if entry.obj and entry.obj.Parent then
+            if currentRarityFilter == nil or entry.rarity == currentRarityFilter then
+                if currentSearchQuery == "" or entry.name:lower():find(currentSearchQuery, 1, true) then
+                    table.insert(filtered, entry)
+                end
+            end
+        end
+    end
+    table.sort(filtered, function(a, b)
+        local ra = RARITY_ORDER[a.rarity] or 99
+        local rb = RARITY_ORDER[b.rarity] or 99
+        if ra ~= rb then return ra < rb end
+        local ma = (a.mutation ~= "Normal") and 0 or 1
+        local mb = (b.mutation ~= "Normal") and 0 or 1
+        if ma ~= mb then return ma < mb end
+        return a.name < b.name
+    end)
+    for i, entry in ipairs(filtered) do makeEntry(entry, i) end
+    rarityLabel.Text = "Viewing: " .. (currentRarityFilter or "All")
+    countLabel.Text  = "Count: " .. #filtered
+end
+
+local function stopListUpdate()
+    listPanelVisible = false
+    if listUpdateThread then task.cancel(listUpdateThread) listUpdateThread = nil end
+end
+
+local function showPanel(rarityFilter)
+    currentRarityFilter = rarityFilter
+    currentSearchQuery  = ""
+    searchBar.Text      = ""
+    listPanelVisible    = true
+    panel.Visible       = true
+    scrollFrame.CanvasPosition = Vector2.new(0, 0)
+    pcall(refreshList)
+    if listUpdateThread then task.cancel(listUpdateThread) end
+    listUpdateThread = task.spawn(function()
+        while listPanelVisible do
+            task.wait(1.2)
+            pcall(refreshList)
+        end
+    end)
+end
+
+closeBtn.MouseButton1Click:Connect(function()
+    panel.Visible = false
+    stopListUpdate()
+end)
+
+local dragging     = false
+local dragStart    = nil
+local dragStartPos = nil
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging     = true
+        dragStart    = input.Position
+        dragStartPos = panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
+        local d = input.Position - dragStart
+        panel.Position = UDim2.new(
+            dragStartPos.X.Scale, dragStartPos.X.Offset + d.X,
+            dragStartPos.Y.Scale, dragStartPos.Y.Offset + d.Y
+        )
+    end
+end)
+
+BrainrotListTab:CreateSection("Rarities")
+
+BrainrotListTab:CreateButton({
+    Name     = "📋  All Brainrots",
+    Callback = function() showPanel(nil) end,
+})
+
+for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"}) do
+    BrainrotListTab:CreateButton({
+        Name     = rarity,
+        Callback = function() showPanel(rarity) end,
+    })
+end
+end
+
+pcall(function() Rayfield:LoadConfiguration() end)
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function() Rayfield:SaveConfiguration() end)
+    end
+end)
+
+if getgenv().OxyoAutoHopCoin == true and not getgenv().OxyoHopStopped then
+    autoHopCoinEnabled = true
+    autoCoinEnabled    = true
+    hideLava()
+    showStopHopGui()
+
+    task.spawn(function()
+        Rayfield:Notify({ Title = "Auto Hop", Content = "Checking for Coin Rain...", Duration = 3, Image = 4483362458 })
+
+        local status, timeLeft = waitForCoinRainStatus(15)
+
+        if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+
+        if status == "active" then
+            if (timeLeft or 0) < 10 then
+                Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain almost over — hopping...", Duration = 2, Image = 4483362458 })
+                task.wait(1)
+                if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+                task.spawn(smartHop)
+            else
+                Rayfield:Notify({ Title = "Coin Rain!", Content = "Active! Farming now...", Duration = 3, Image = 4483362458 })
+                coinEventActive   = true
+                coinEventDuration = timeLeft or 60
+                startCoinCollect()
+            end
+
+        elseif status == "queued" then
+            Rayfield:Notify({ Title = "Auto Hop", Content = "Coin Rain in " .. tostring(timeLeft) .. "s — waiting...", Duration = 4, Image = 4483362458 })
+            task.spawn(function()
+                task.wait(timeLeft + 2)
+                if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+                if autoHopCoinEnabled and not coinEventActive then
+                    coinEventActive   = true
+                    coinEventDuration = 60
+                    startCoinCollect()
+                end
+            end)
+        else
+            Rayfield:Notify({ Title = "Auto Hop", Content = "No Coin Rain — hopping...", Duration = 2, Image = 4483362458 })
+            task.wait(1)
+            if not getgenv().OxyoAutoHopCoin or getgenv().OxyoHopStopped then return end
+            task.spawn(smartHop)
+        end
+    end)
+end
+
+if getgenv().OxyoAutoHopGodly == true and not getgenv().OxyoHopGodlyStopped then
+    autoHopGodlyEnabled = true
+    hideLava()
+    showStopHopGui()
+    autoHopGodlyThread = task.spawn(function()
+        runRarityHopFarm("Godly", "OxyoAutoHopGodly", "OxyoHopGodlyStopped")
+    end)
+end
+
+if getgenv().OxyoAutoHopCel == true and not getgenv().OxyoHopCelStopped then
+    autoHopCelEnabled = true
+    hideLava()
+    showStopHopGui()
+    autoHopCelThread = task.spawn(function()
+        runRarityHopFarm("Celestial", "OxyoAutoHopCel", "OxyoHopCelStopped")
+    end)
+end
+
+print("Oxyo Hub loaded.")
