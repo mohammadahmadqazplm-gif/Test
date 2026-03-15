@@ -113,7 +113,7 @@ local _hasAdvancedAPI = (typeof(getrawmetatable) == "function")
 -- ──────────────────────────────────────────────────────────────────────────────
 
 
-local AUTO_EXEC_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Test/refs/heads/main/Test"
+local AUTO_EXEC_URL = "https://raw.githubusercontent.com/mohammadahmadqazplm-gif/Lava/refs/heads/main/Lava"
 
 local function doTeleport(serverId)
     if queue_on_teleport then
@@ -237,8 +237,7 @@ if _hasAdvancedAPI then
                 local args = {...}
                 if typeof(args[1]) == "string" then
                     local s = args[1]:lower()
-                    if s:find("kick") or s:find("ban") or s:find("anticheat") or
-                       s:find("detect") or s:find("flag") or s:find("report") then
+                    if s:find("kick") or s:find("ban") or s:find("anticheat") then
                         return
                     end
                 end
@@ -255,7 +254,7 @@ end
 for _, v in pairs(game:GetDescendants()) do
     if v:IsA("LocalScript") then
         local n = v.Name:lower()
-        if n:find("anticheat") or n:find("detect") or n:find("security") then
+        if n == "anticheat" then
             pcall(function() v.Disabled = true v:Destroy() end)
         end
     end
@@ -264,7 +263,7 @@ end
 game.DescendantAdded:Connect(function(v)
     if v:IsA("LocalScript") then
         local n = v.Name:lower()
-        if n:find("anticheat") or n:find("detect") or n:find("security") then
+        if n == "anticheat" then
             task.wait(0.1)
             pcall(function() v.Disabled = true v:Destroy() end)
         end
@@ -287,9 +286,6 @@ do
                 pcall(function()
                     VirtualUser:CaptureController()
                     VirtualUser:ClickButton2(Vector2.new())
-                    VirtualUser:Button1Down(Vector2.new(), workspace.CurrentCamera.CFrame)
-                    task.wait(0.05)
-                    VirtualUser:Button1Up(Vector2.new(), workspace.CurrentCamera.CFrame)
                 end)
                 lastActive = tick()
             end
@@ -316,7 +312,7 @@ local Window = Rayfield:CreateWindow({
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "OxyoHub",
-        FileName   = "oxyoHub_v5",
+        FileName   = "oxyoHub_v6",
     },
     Discord = {
         Enabled       = false,
@@ -397,7 +393,7 @@ local function getPlotsFolder()
 end
 
 local ALL_RARITIES = {"Common","Rare","Epic","Legendary","Mythic","Secret","Celestial","Godly"}
-local ALL_TRAITS   = {"MoonGlow","Magma","Storm","Slime"}
+local ALL_TRAITS   = {"MoonGlow","Magma","Storm","Slime","Volcano","Shamrock","Ice"}
 local RARITY_ORDER = {Godly=1,Celestial=2,Secret=3,Mythic=4,Legendary=5,Epic=6,Rare=7,Common=8}
 
 local monitorData = {
@@ -415,10 +411,9 @@ local auto = {
     moneyEnabled   = false, moneyThread    = nil,
     upgradeEnabled = false, upgradeThread  = nil,
     sellEnabled    = false, sellThread     = nil, sellThreshold = 50, sellTimer = 0,
-    cheeseEnabled  = false, cheeseThread   = nil, cheeseBusy    = false,
-    feedEnabled    = false, feedThread     = nil, feedInterval  = 35,
     buyEnabled     = false, buyThread      = nil, lastNotif     = "",
     alertEnabled   = false, alertThread    = nil,
+    stPatEnabled   = false, stPatThread    = nil,
 }
 local autoCoinEnabled    = false
 local autoHopCoinEnabled = false
@@ -457,6 +452,7 @@ local LUCKY_TYPES = {
     "Secret Lucky Block","Godly Lucky Block","Magma Lucky Block",
     "Food Lucky Block","Moon Magma Lucky Block","Moon Celestial Lucky Block",
     "Moon Secret Lucky Block","Moon Mythic Lucky Block",
+    "Dino Lucky Block",
 }
 
 local ALERT_MUTATIONS       = {"Gold","Emerald","Diamond","Cheese","Bloodmoon","Rainbow"}
@@ -469,7 +465,7 @@ local BrainrotStatusTab = Window:CreateTab("Brainrot Status",    4483362458)
 local LuckyStatusTab    = Window:CreateTab("Lucky Block Status", 4483362458)
 local GearTab           = Window:CreateTab("Shop",               4483362458)
 local HopTab            = Window:CreateTab("Hop",                4483362458)
-local CheeseTab         = Window:CreateTab("Event (Cheese)",     4483362458)
+local StPatricksTab     = Window:CreateTab("🍀 St Patricks",     4483362458)
 local ZonesTab          = Window:CreateTab("Zones",              4483362458)
 local HitboxTab         = Window:CreateTab("Hitbox",             4483362458)
 local ExtraTab          = Window:CreateTab("Extra",              4483362458)
@@ -623,7 +619,7 @@ local function findSubmitZone()
         for _, d in pairs(gf:GetDescendants()) do
             if d:IsA("BasePart") then
                 local n = d.Name:lower()
-                if n:find("submit") or n:find("collect") or n:find("deposit") or n:find("drop") then
+                if n:find("submit") or n:find("collect") or n:find("deposit") then
                     _cachedSubmitPart = d
                     return d.CFrame + Vector3.new(0, 3, 0)
                 end
@@ -695,6 +691,39 @@ local function submitAndPlace()
         end
     end)
     task.wait(0.3)
+end
+
+local function submitToCauldronNew()
+    pcall(function()
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        -- أولاً: تمر بنقطة الحساب
+        local tw1 = TweenService:Create(root,
+            TweenInfo.new(0.5, Enum.EasingStyle.Linear),
+            { CFrame = CFrame.new(-42.191628, 4.259904, -55.820633) }
+        )
+        tw1:Play() tw1.Completed:Wait()
+        task.wait(0.3)
+
+        -- ثانياً: روح للقدر
+        local tw2 = TweenService:Create(root,
+            TweenInfo.new(0.5, Enum.EasingStyle.Linear),
+            { CFrame = CFrame.new(-89.554, 4.565, -11.030) }
+        )
+        tw2:Play() tw2.Completed:Wait()
+        task.wait(0.5)
+
+        -- submit
+        local gf = workspace:FindFirstChild("GameFolder")
+        local sp = gf and gf:FindFirstChild("StPatricksEvent")
+        local m1 = sp and sp:FindFirstChild("Model1")
+        local prompt = m1 and m1:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then
+            _fireprox(prompt)
+        end
+        task.wait(0.5)
+    end)
 end
 
 local function passesFarmFilters(obj)
@@ -1251,11 +1280,7 @@ local function buyGear(gearKey)
 
     auto.lastNotif = ""
     pcall(function()
-        if remote:IsA("RemoteFunction") then
-            remote:InvokeServer(data.serverKey)
-        else
-            remote:FireServer(data.serverKey)
-        end
+        remote:FireServer(data.serverKey)
     end)
 
     local waited = 0
@@ -1438,8 +1463,8 @@ MainTab:CreateButton({
             "InstantGrab","NoClip","SpeedEnabled","JumpEnabled","InfinityJump",
             "AutoMeteor","AutoLuckyBlock","AutoSpinWheel","AutoFarmToggle",
             "AutoFarmNameToggle","AutoMoney","AutoCoin","AutoHopCoin",
-            "AutoUpgrade","AutoSell","MutationAlert","AutoBuyGear",
-            "AutoCheese","AutoFeedSteak","HitboxToggle","FullBright",
+            "AutoUpgrade","AutoSell","MutationAlert","AutoBuyGear","AutoStPatricks",
+            "HitboxToggle","FullBright",
             "InfiniteZoom","PlayerESP","CelestialESP",
         }
         local slidersDefault = {
@@ -2776,6 +2801,7 @@ GearTab:CreateButton({
             return
         end
         task.spawn(function()
+            do
             local data   = GEAR_REGISTRY[selectedGear]
             local result = buyGear(selectedGear)
             if result == BUY_RESULT.SUCCESS then
@@ -2786,6 +2812,7 @@ GearTab:CreateButton({
                 Rayfield:Notify({ Title = "Not Enough Coins", Content = "Need " .. data.coinPrice .. " coins for " .. data.displayName, Duration = 4, Image = 4483362458 })
             elseif result == BUY_RESULT.NOT_IN_SHOP then
                 Rayfield:Notify({ Title = "Not in Shop", Content = data.displayName .. " is not available right now.", Duration = 4, Image = 4483362458 })
+            end
             end
         end)
     end,
@@ -2897,116 +2924,131 @@ GearTab:CreateToggle({
     end,
 })
 
-CheeseTab:CreateSection("Auto Cheese")
 
-local function runAutoCheeseLoop()
-    while auto.cheeseEnabled do
-        if auto.cheeseBusy or _G.cheeseEventBusy then task.wait(0.1) continue end
-        local gf = workspace:FindFirstChild("GameFolder")
-        local cheeseFolder = gf and gf:FindFirstChild("CheeseFolder")
-        if not cheeseFolder then task.wait(2) continue end
-        local cheeses = cheeseFolder:GetChildren()
-        if #cheeses == 0 then task.wait(1.5) continue end
-        for _, cheeseModel in ipairs(cheeses) do
-            if not auto.cheeseEnabled then break end
-            if auto.cheeseBusy or _G.cheeseEventBusy then task.wait(0.1) break end
-            if not cheeseModel or not cheeseModel.Parent then continue end
-            local mainPart = cheeseModel:FindFirstChild("Main")
-            if not mainPart or not mainPart:IsA("BasePart") then continue end
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if not root then task.wait(1) break end
-            safeTeleport(CFrame.new(mainPart.Position + Vector3.new(0, 2, 0)))
-            task.wait(0.35)
-        end
-        task.wait(0.5)
-    end
+-- ── ST PATRICKS ─────────────────────────────────────────────────────────────
+
+local function getCauldronPrompt()
+    local gf = workspace:FindFirstChild("GameFolder")
+    local sp = gf and gf:FindFirstChild("StPatricksEvent")
+    local m1 = sp and sp:FindFirstChild("Model1")
+    if not m1 then return nil end
+    return m1:FindFirstChildWhichIsA("ProximityPrompt", true)
 end
 
-CheeseTab:CreateToggle({
-    Name         = "Auto Collect Cheese",
+local function getGoldBrainrots()
+    local found = {}
+    for _, entry in ipairs(monitorData.brainrots) do
+        if entry.obj and entry.obj.Parent then
+            local mutation = entry.obj:GetAttribute("Mutation") or "Normal"
+            if mutation == "Gold" then
+                table.insert(found, entry.obj)
+            end
+        end
+    end
+    return found
+end
+
+
+StPatricksTab:CreateParagraph({
+    Title   = "St Patricks — Auto Collect Gold",
+    Content = "Finds Gold mutated Brainrots → grabs → submits to Cauldron.\nNeeds 100 Gold Brainrots to trigger the Shamrock event.",
+})
+
+local stPatCountPara = StPatricksTab:CreateParagraph({
+    Title   = "Gold Brainrots in World",
+    Content = "0",
+})
+
+StPatricksTab:CreateSection("Auto Collect & Submit")
+
+StPatricksTab:CreateToggle({
+    Name         = "Auto Collect Gold Brainrots",
     CurrentValue = false,
-    Flag         = "AutoCheese",
+    Flag         = "AutoStPatricks",
     Callback     = function(Value)
-        auto.cheeseEnabled = Value
+        auto.stPatEnabled = Value
         if Value then
             hideLava()
-            auto.cheeseThread = task.spawn(runAutoCheeseLoop)
-        else
-            if auto.cheeseThread then task.cancel(auto.cheeseThread) auto.cheeseThread = nil end
-        end
-    end,
-})
-
-CheeseTab:CreateSection("Auto Feed Steak")
-
-local function getCheeseSubmitPrompt()
-    local gf = workspace:FindFirstChild("GameFolder")
-    if not gf then return nil end
-    local ev = gf:FindFirstChild("CheeseEvent")
-    if not ev then return nil end
-    local plat = ev:FindFirstChild("Platform")
-    if not plat then return nil end
-    local att = plat:FindFirstChild("SubmitAttachment")
-    if att then
-        local p = att:FindFirstChildWhichIsA("ProximityPrompt")
-                  or att:FindFirstChild("Prompt")
-        if p then return p end
-    end
-    return plat:FindFirstChildWhichIsA("ProximityPrompt", true)
-end
-
-local function getCheeseEventPos()
-    local gf = workspace:FindFirstChild("GameFolder")
-    if not gf then return nil end
-    local ev = gf:FindFirstChild("CheeseEvent")
-    if not ev then return nil end
-    local plat = ev:FindFirstChild("Platform")
-    if not plat then return nil end
-    local bp = plat:FindFirstChildWhichIsA("BasePart") or (plat:IsA("BasePart") and plat)
-    return bp and bp.Position
-end
-
-CheeseTab:CreateToggle({
-    Name         = "Auto Feed Steak",
-    CurrentValue = false,
-    Flag         = "AutoFeedSteak",
-    Callback     = function(Value)
-        auto.feedEnabled = Value
-        if Value then
-            auto.feedThread = task.spawn(function()
-                while auto.feedEnabled do
-                    if auto.cheeseEnabled then
-                        auto.cheeseBusy    = true
-                        _G.cheeseEventBusy = true
-                    end
-                    pcall(function()
-                        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                        local pos  = getCheeseEventPos()
-                        if root and pos then
-                            root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-                        end
-                    end)
-                    task.wait(1.5)
-                    pcall(function()
-                        local prompt = getCheeseSubmitPrompt()
-                        if prompt then _fireprox(prompt) end
-                    end)
-                    if auto.cheeseEnabled then
-                        auto.cheeseBusy    = false
-                        _G.cheeseEventBusy = false
-                    end
-                    task.wait(auto.feedInterval)
+            auto.stPatThread = task.spawn(function()
+                local function getCauldronPrompt2()
+                    local gf = workspace:FindFirstChild("GameFolder")
+                    local sp = gf and gf:FindFirstChild("StPatricksEvent")
+                    local m1 = sp and sp:FindFirstChild("Model1")
+                    if not m1 then return nil end
+                    return m1:FindFirstChildWhichIsA("ProximityPrompt", true)
                 end
-                auto.cheeseBusy    = false
-                _G.cheeseEventBusy = false
+
+                local function submitToCauldron()
+                    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if not root then return end
+                    local tw1 = TweenService:Create(root,
+                        TweenInfo.new(0.4, Enum.EasingStyle.Linear),
+                        { CFrame = CFrame.new(-42.191628, 4.259904, -55.820633) }
+                    )
+                    tw1:Play() tw1.Completed:Wait()
+                    task.wait(0.2)
+                    local tw2 = TweenService:Create(root,
+                        TweenInfo.new(0.5, Enum.EasingStyle.Linear),
+                        { CFrame = CFrame.new(-89.554, 4.565, -11.030) }
+                    )
+                    tw2:Play() tw2.Completed:Wait()
+                    task.wait(0.35)
+                    local cauldronPrompt = getCauldronPrompt2()
+                    if cauldronPrompt then
+                        _fireprox(cauldronPrompt)
+                    end
+                    task.wait(0.4)
+                end
+
+                while auto.stPatEnabled do
+                    local golds = getGoldBrainrots()
+                    pcall(function()
+                        stPatCountPara:Set({ Title = "Gold in World", Content = #golds .. " found" })
+                    end)
+                    if #golds == 0 then task.wait(2) continue end
+
+                    for _, obj in ipairs(golds) do
+                        if not auto.stPatEnabled then break end
+                        if not obj or not obj.Parent then continue end
+                        pcall(grabBrainrot, obj)
+                        task.wait(0.3)
+                        pcall(submitToCauldron)
+                    end
+                    task.wait(0.5)
+                end
             end)
+            Rayfield:Notify({ Title = "🍀 St Patricks", Content = "Started!", Duration = 3, Image = 4483362458 })
         else
-            if auto.feedThread then task.cancel(auto.feedThread) auto.feedThread = nil end
-            auto.cheeseBusy    = false
-            _G.cheeseEventBusy = false
+            if auto.stPatThread then task.cancel(auto.stPatThread) auto.stPatThread = nil end
+            Rayfield:Notify({ Title = "🍀 St Patricks", Content = "Stopped.", Duration = 2, Image = 4483362458 })
         end
     end,
 })
+
+StPatricksTab:CreateButton({
+    Name     = "Teleport to Cauldron",
+    Callback = function()
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if root then root.CFrame = CFrame.new(-89.554, 4.565, -11.030) end
+    end,
+})
+
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if not auto.stPatEnabled then
+            pcall(function()
+                local golds = getGoldBrainrots()
+                stPatCountPara:Set({
+                    Title   = "Gold Brainrots in World",
+                    Content = tostring(#golds) .. " found",
+                })
+            end)
+        end
+    end
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
 
 ZonesTab:CreateSection("Teleport to Zones")
 
@@ -3019,7 +3061,8 @@ local zones = {
     { name = "Secret Zone",    pos = Vector3.new(-41.617702,  77.059113,  -1857.829224) },
     { name = "Celestial Zone", pos = Vector3.new(-44.376785, 170.028870,  -2253.302979) },
     { name = "End Zone",       pos = Vector3.new(-16.794611, 444.921265,  -3505.147217) },
-    { name = "Fuse Zone",      pos = Vector3.new(-4.381921,  511.245667,  -3622.835449) },
+    { name = "Fuse Zone",        pos = Vector3.new(-4.381921,  511.245667,  -3622.835449) },
+    { name = "🌋 Volcano Entry", pos = Vector3.new(-114.334838, 7.146873, -960.122192) },
 }
 
 for _, zone in ipairs(zones) do
@@ -3247,7 +3290,7 @@ ExtraTab:CreateToggle({
     end,
 })
 
-do
+;(function()
 local RARITY_COLORS = {
     Common    = Color3.fromRGB(180, 180, 180),
     Uncommon  = Color3.fromRGB(100, 220, 100),
@@ -3588,7 +3631,7 @@ for _, rarity in ipairs({"Common","Rare","Epic","Legendary","Mythic","Secret","C
         Callback = function() showPanel(rarity) end,
     })
 end
-end
+end)()
 
 pcall(function() Rayfield:LoadConfiguration() end)
 
